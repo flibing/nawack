@@ -389,6 +389,13 @@
                         <button class="btn btn-primary" onclick="loadFromUrl()">加载</button>
                     </div>
                     <div id="urlStatus" class="status-msg"></div>
+                    <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <label style="display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;cursor:pointer;color:var(--text-secondary,#8b93a7);">
+                            <input type="checkbox" id="proxyToggle" onchange="saveProxySetting()" style="accent-color:#4a7dff;transform:scale(1.1);cursor:pointer;"> 走代理
+                        </label>
+                        <input type="text" id="proxyAddr" placeholder="Worker 代理地址，例：https://tvbox.你的域名（部署见 worker.js）" style="flex:1;min-width:220px;padding:8px 12px;font-size:13px;border:1.5px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--input-text);" />
+                        <button class="btn" onclick="saveProxySetting()" style="padding:8px 14px;font-size:13px;">保存</button>
+                    </div>
                 </div>
                 <div class="load-method">
                     <h4>📋 粘贴接口内容</h4>
@@ -524,6 +531,99 @@
                 💡 在预览区修改 JSON 后，点击「从预览更新界面」可同步到表单；点击「复制并加密」复制当前配置并打开加密工具。
             </div>
         </div>
+
+        <!-- 一键解密链 -->
+        <div class="card">
+            <h2>🔓 一键解密 · 导入配置</h2>
+            <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px;line-height:1.6;">
+                粘贴加密串、明文 JSON 或带注释的文件内容。自动尝试 <b>Base64 → AES → Gzip</b> 的全部组合链，直接吐出 tvbox 配置，并可一键填回上面的表单。
+            </div>
+
+            <textarea id="chainInput" rows="7" placeholder="粘贴密文 / 加密串 / 明文 JSON；也可点下方「选择文件」直接读入"></textarea>
+
+            <div class="action-bar" style="margin-top:8px;">
+                <input type="file" id="chainFile" accept=".json,.txt,.js,.html,text/*,application/json" style="display:none;" onchange="loadChainFile(this)" />
+                <button class="btn btn-outline" onclick="document.getElementById('chainFile').click()">📁 选择文件</button>
+                <input type="text" id="chainUrl" placeholder="或从 URL 拉取（走上面的代理开关）" style="flex:1;min-width:170px;padding:8px 12px;font-size:13px;border:1.5px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--input-text);" />
+                <button class="btn btn-outline" onclick="loadChainUrl()">🌐 拉取</button>
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+                <input type="text" id="chainKey" placeholder="Key（明文配置可留空）" style="flex:1;min-width:140px;padding:8px 12px;font-size:13px;border:1.5px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--input-text);" />
+                <input type="text" id="chainIv" placeholder="IV（ECB 可留空）" style="flex:1;min-width:140px;padding:8px 12px;font-size:13px;border:1.5px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--input-text);" />
+                <select id="chainMode" style="padding:8px 10px;font-size:13px;border:1.5px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--input-text);">
+                    <option value="CBC">CBC</option>
+                    <option value="ECB">ECB</option>
+                </select>
+                <button class="btn btn-outline" onclick="saveChainKeys()">记住</button>
+            </div>
+
+            <div class="action-bar" style="margin-top:10px;">
+                <button class="btn btn-primary" onclick="runDecryptChain()">🚀 一键解密</button>
+                <button class="btn btn-outline" onclick="clearChain()">清空</button>
+            </div>
+
+            <div id="chainProgress" style="font-size:12px;color:var(--text-muted);margin-top:6px;min-height:16px;"></div>
+
+            <textarea id="chainOutput" rows="10" placeholder="解密结果" readonly style="margin-top:8px;"></textarea>
+
+            <div class="action-bar" style="margin-top:8px;">
+                <button class="btn btn-primary" onclick="importChainResult()">📥 导入到配置生成器</button>
+                <button class="btn btn-outline" onclick="copyChainResult()">📋 复制</button>
+                <button class="btn btn-outline" onclick="downloadChainResult()">⬇️ 下载 json</button>
+            </div>
+
+            <div id="chainStatus" class="status-msg" style="margin-top:10px;"></div>
+        </div>
+
+        <!-- 实用工具 -->
+        <div class="card">
+            <h2>🧰 实用工具</h2>
+
+            <h4>🔐 Base64 编解码</h4>
+            <textarea id="b64Input" rows="3" placeholder="输入原文（编码）或 Base64 串（解码）"></textarea>
+            <div class="action-bar">
+                <button class="btn btn-primary" onclick="b64Encode()">编码 →</button>
+                <button class="btn btn-outline" onclick="b64Decode()">解码 ←</button>
+            </div>
+            <textarea id="b64Output" rows="3" placeholder="结果" readonly style="margin-top:6px;"></textarea>
+
+            <h4 style="margin-top:20px;">🔓 AES 解密</h4>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+                <input type="text" id="aesKey" placeholder="Key" style="flex:1;min-width:130px;padding:8px 12px;font-size:13px;border:1.5px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--input-text);" />
+                <input type="text" id="aesIv" placeholder="IV（ECB 模式可留空）" style="flex:1;min-width:130px;padding:8px 12px;font-size:13px;border:1.5px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--input-text);" />
+                <select id="aesMode" style="padding:8px 10px;font-size:13px;border:1.5px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--input-text);">
+                    <option value="CBC">CBC</option>
+                    <option value="ECB">ECB</option>
+                </select>
+                <select id="aesFmt" style="padding:8px 10px;font-size:13px;border:1.5px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--input-text);">
+                    <option value="hex">Hex 密文</option>
+                    <option value="base64">Base64 密文</option>
+                </select>
+            </div>
+            <textarea id="aesInput" rows="3" placeholder="粘贴密文"></textarea>
+            <div class="action-bar">
+                <button class="btn btn-primary" onclick="aesDecryptTool()">解密</button>
+            </div>
+            <textarea id="aesOutput" rows="4" placeholder="明文结果" readonly style="margin-top:6px;"></textarea>
+
+            <h4 style="margin-top:20px;">🗜️ Gzip 解码</h4>
+            <textarea id="gzipInput" rows="2" placeholder="粘贴 Gzip 数据的 Base64 编码"></textarea>
+            <div class="action-bar">
+                <button class="btn btn-primary" onclick="gzipDecodeTool()">解压</button>
+            </div>
+            <textarea id="gzipOutput" rows="4" placeholder="解压结果" readonly style="margin-top:6px;"></textarea>
+
+            <h4 style="margin-top:20px;">🧩 JS / JSON 美化</h4>
+            <textarea id="jsInput" rows="3" placeholder="粘贴 JS 或 JSON（若整体是 Base64 会自动先解一层）"></textarea>
+            <div class="action-bar">
+                <button class="btn btn-primary" onclick="beautifyTool()">格式化</button>
+                <button class="btn btn-outline" onclick="minifyTool()">压缩</button>
+            </div>
+            <textarea id="jsOutput" rows="6" placeholder="结果" readonly style="margin-top:6px;"></textarea>
+
+            <div id="toolStatus" class="status-msg" style="margin-top:12px;"></div>
+        </div>
     </div>
 
     <script>
@@ -580,7 +680,6 @@
             }
         }
 
-
         // ============================================================
         //  工具函数
         // ============================================================
@@ -608,7 +707,6 @@
             document.getElementById(id).classList.toggle('open');
         }
 
-
         // ============================================================
         //  数据状态
         // ============================================================
@@ -622,7 +720,6 @@
         // 拖拽状态
         var dragSourceList = null;
         var dragSourceIndex = null;
-
 
         // ============================================================
         //  渲染 & 状态管理
@@ -691,7 +788,6 @@
                 extraGlobal = {};
             }
         }
-
 
         // ============================================================
         //  复制 & 移动
@@ -770,7 +866,6 @@
             arr.splice(toIndex, 0, item);
         }
 
-
         // ============================================================
         //  拖拽事件处理（HTML5 Drag and Drop）
         // ============================================================
@@ -813,6 +908,7 @@
                 moveItemTo(state.sites, dragSourceIndex, targetIndex);
                 renderSites();
                 generateConfig();
+        initChain();
             } else if (dragSourceList === 'liveList') {
                 moveItemTo(state.lives, dragSourceIndex, targetIndex);
                 renderLives();
@@ -838,10 +934,27 @@
         document.addEventListener('drop', handleDrop);
         document.addEventListener('dragend', handleDragEnd);
 
-
         // ============================================================
         //  核心加载函数（自动尝试解密，失败则填入粘贴框）
         // ============================================================
+
+        function saveProxySetting() {
+            try {
+                localStorage.setItem('tvbox_proxy_addr', document.getElementById('proxyAddr').value);
+                localStorage.setItem('tvbox_proxy_on', document.getElementById('proxyToggle').checked ? '1' : '0');
+                showStatus('urlStatus', '✅ 代理设置已保存（勾选"走代理"后生效）', 'success');
+            } catch (e) {}
+        }
+        (function initProxySetting() {
+            try {
+                var a = localStorage.getItem('tvbox_proxy_addr') || '';
+                var on = localStorage.getItem('tvbox_proxy_on') === '1';
+                var pa = document.getElementById('proxyAddr');
+                var pt = document.getElementById('proxyToggle');
+                if (pa && a) pa.value = a;
+                if (pt) pt.checked = on;
+            } catch (e) {}
+        })();
 
         async function loadFromUrl() {
             var url = document.getElementById('loadUrl').value.trim();
@@ -849,7 +962,16 @@
             showStatus('urlStatus', '加载中...', '');
 
             try {
-                var resp = await fetch(url, { mode: 'cors' });
+                var pToggle = document.getElementById('proxyToggle');
+                var pAddrEl = document.getElementById('proxyAddr');
+                var pAddr = (pAddrEl ? pAddrEl.value : '').trim().replace(/\/+$/, '');
+                var target = url;
+                var usedProxy = false;
+                if (pToggle && pToggle.checked && pAddr) {
+                    target = pAddr + '?url=' + encodeURIComponent(url);
+                    usedProxy = true;
+                }
+                var resp = await fetch(target, { mode: 'cors' });
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 var text = await resp.text();
 
@@ -923,11 +1045,13 @@
                 console.error('未能解析，原始内容前500字符:', text.substring(0, 500));
 
             } catch (e) {
-                showStatus('urlStatus', '❌ 加载失败：' + e.message, 'error');
+                var hint = usedProxy
+                    ? '已走代理，请检查代理地址是否正确、Worker 是否已部署'
+                    : 'https 页面无法直接请求 http 资源；可勾选"走代理"或改用右侧粘贴方式';
+                showStatus('urlStatus', '❌ 加载失败：' + e.message + '　（' + hint + '）', 'error');
                 console.error(e);
             }
         }
-
 
         // ============================================================
         //  粘贴加载（解析 JSON）
@@ -949,7 +1073,6 @@
                 showStatus('pasteStatus', '❌ JSON 解析错误：' + e.message, 'error');
             }
         }
-
 
         // ============================================================
         //  解密粘贴框内容（手动解密）
@@ -1012,7 +1135,6 @@
             }
         }
 
-
         // ============================================================
         //  从预览更新界面
         // ============================================================
@@ -1034,7 +1156,6 @@
                 alert('❌ JSON 解析错误：' + e.message);
             }
         }
-
 
         // ============================================================
         //  复制并加密（复制预览内容，打开加密工具）
@@ -1074,7 +1195,6 @@
             document.body.removeChild(ta);
         }
 
-
         // ============================================================
         //  应用配置到 UI
         // ============================================================
@@ -1113,7 +1233,6 @@
                 return false;
             }
         }
-
 
         // ============================================================
         //  CRUD: 视频源
@@ -1258,7 +1377,6 @@
             });
         }
 
-
         // ============================================================
         //  CRUD: 直播源
         // ============================================================
@@ -1365,7 +1483,6 @@
             });
         }
 
-
         // ============================================================
         //  CRUD: 解析接口
         // ============================================================
@@ -1442,7 +1559,6 @@
             });
         }
 
-
         // ============================================================
         //  生成配置
         // ============================================================
@@ -1476,7 +1592,6 @@
             document.getElementById('base64Result').textContent = '';
             return json;
         }
-
 
         // ============================================================
         //  导出功能
@@ -1525,7 +1640,6 @@
             } catch (e) { alert('配置格式错误'); }
         }
 
-
         // ============================================================
         //  深色模式切换
         // ============================================================
@@ -1551,10 +1665,792 @@
             setTheme(theme);
         })();
 
-
         // ============================================================
         //  初始化
         // ============================================================
+
+        // ============================================================
+        //  一键解密链：Base64 → AES → Gzip → tvbox JSON
+        // ============================================================
+
+        function setChainStatus(msg, type) {
+            var el = document.getElementById('chainStatus');
+            if (!el) return;
+            el.textContent = msg || '';
+            el.className = 'status-msg' + (type ? ' status-' + type : '');
+            el.style.display = msg ? 'block' : 'none';
+        }
+        function setChainProgress(msg) {
+            var el = document.getElementById('chainProgress');
+            if (el) el.textContent = msg || '';
+        }
+
+        // ---------- 字节 / 文本 互转 ----------
+        function u8(text) { return new TextEncoder().encode(text); }
+        function u8ToStr(bytes) {
+            try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+            catch (e) { return null; }
+        }
+
+        // ---------- 文本预处理 ----------
+        function unescapeAllText(t) {
+            return t
+                .replace(/\\u\{([0-9a-fA-F]+)\}/g, function (m, h) { return String.fromCodePoint(parseInt(h, 16)); })
+                .replace(/\\u([0-9a-fA-F]{4})/g, function (m, h) { return String.fromCharCode(parseInt(h, 16)); })
+                .replace(/\\x([0-9a-fA-F]{2})/g, function (m, h) { return String.fromCharCode(parseInt(h, 16)); });
+        }
+        function extractJsonBlock(text) {
+            var start = text.indexOf('{');
+            if (start < 0) return null;
+            var depth = 0, inStr = false, esc = false;
+            for (var i = start; i < text.length; i++) {
+                var c = text[i];
+                if (inStr) {
+                    if (esc) esc = false;
+                    else if (c === '\\') esc = true;
+                    else if (c === '"') inStr = false;
+                    continue;
+                }
+                if (c === '"') { inStr = true; continue; }
+                if (c === '{') depth++;
+                else if (c === '}') {
+                    depth--;
+                    if (depth === 0) return text.slice(start, i + 1);
+                }
+            }
+            return null;
+        }
+
+        // 自描述加密：$#<pwdHex>#$<密文Hex><时间戳Hex26>
+        // 密钥内嵌在串里，无需用户手填。这里做严格解析（不依赖页面原有的 indexOf 定位）
+        function selfDescDecrypt(text) {
+            try {
+                var t = String(text).trim();
+                if (t.indexOf('$#') !== 0) return null;
+                var close = t.indexOf('#$', 2);
+                if (close < 0) return null;
+                var pwdHex = t.slice(2, close);
+                var rest = t.slice(close + 2);
+                if (pwdHex.length < 2 || rest.length <= 26) return null;
+                var ctHex = rest.slice(0, rest.length - 26);
+                var rtHex = rest.slice(rest.length - 26);
+                if (!/^[0-9a-fA-F]+$/.test(pwdHex) || !/^[0-9a-fA-F]+$/.test(ctHex) || !/^[0-9a-fA-F]{26}$/.test(rtHex)) return null;
+                var pwd = CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Hex.parse(pwdHex));
+                var rt = CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Hex.parse(rtHex));
+                function pad16(s) { return s.length >= 16 ? s.slice(0, 16) : s + new Array(17 - s.length).join('0'); }
+                var key = CryptoJS.enc.Utf8.parse(pad16(pwd));
+                var iv = CryptoJS.enc.Utf8.parse(pad16(rt));
+                var out = CryptoJS.AES.decrypt({ ciphertext: CryptoJS.enc.Hex.parse(ctHex) }, key, {
+                    iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7
+                });
+                var s = CryptoJS.enc.Utf8.stringify(out);
+                return s || null;
+            } catch (e) { return null; }
+        }
+
+        // ---------- WordArray 互转 ----------
+        function bytesToWA(b) {
+            var words = [];
+            for (var i = 0; i < b.length; i++) words[i >>> 2] |= b[i] << (24 - (i % 4) * 8);
+            return CryptoJS.lib.WordArray.create(words, b.length);
+        }
+        function waToBytes(wa) {
+            var words = wa.words, sig = wa.sigBytes;
+            var out = new Uint8Array(sig);
+            for (var i = 0; i < sig; i++) out[i] = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+            return out;
+        }
+
+        // ---------- 单步操作 ----------
+        function tryB64Step(bytes) {
+            var t = u8ToStr(bytes);
+            if (t === null) return null;
+            t = t.trim();
+            if (!t || t.length % 4 !== 0) return null;
+            if (!/^[A-Za-z0-9+/=_-]+$/.test(t)) return null;
+            try {
+                var s = t.replace(/-/g, '+').replace(/_/g, '/');
+                var bin = atob(s);
+                var o = new Uint8Array(bin.length);
+                for (var i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i);
+                return o;
+            } catch (e) { return null; }
+        }
+        async function tryGunzipStep(bytes) {
+            if (typeof DecompressionStream === 'undefined') return null;
+            if (bytes.length < 2) return null;
+            var fmt = null;
+            if (bytes[0] === 0x1f && bytes[1] === 0x8b) fmt = 'gzip';
+            else if (bytes[0] === 0x78) fmt = 'deflate';
+            else return null;                       // 不是压缩流，快速跳过
+            try {
+                var ds = new DecompressionStream(fmt);
+                var stream = new Blob([bytes]).stream().pipeThrough(ds);
+                var ab = await new Response(stream).arrayBuffer();
+                return new Uint8Array(ab);
+            } catch (e) { return null; }
+        }
+        function tryAesStep(bytes, opt) {
+            if (bytes.length === 0 || bytes.length % 16 !== 0) return null;
+            try {
+                // 注意：mode 必须是 CryptoJS.mode.* 对象，传字符串会静默失败
+                var cfg = {
+                    mode: opt.mode === 'ECB' ? CryptoJS.mode.ECB : CryptoJS.mode.CBC,
+                    padding: CryptoJS.pad.Pkcs7
+                };
+                if (opt.mode !== 'ECB' && opt.iv) cfg.iv = opt.iv;
+                var wa = CryptoJS.AES.decrypt({ ciphertext: bytesToWA(bytes) }, opt.key, cfg);
+                return waToBytes(wa);
+            } catch (e) { return null; }
+        }
+
+        // ---------- 结果评分 ----------
+        function evalResult(bytes) {
+            if (!bytes || !bytes.length) return { score: 0 };
+            var t = u8ToStr(bytes);
+            if (t === null || !t.trim()) return { score: 0 };
+            var n = Math.min(t.length, 5000), bad = 0;
+            for (var i = 0; i < n; i++) {
+                var c = t.charCodeAt(i);
+                if (c === 0xFFFD || (c < 0x20 && c !== 9 && c !== 10 && c !== 13)) bad++;
+            }
+            if (bad / n > 0.02) return { score: 0 };
+            var out = { score: 20, text: t };
+            var s = t.trim();
+            if (s[0] === '{' || s[0] === '[') {
+                try {
+                    var o = JSON.parse(s);
+                    out.score = 60; out.obj = o;
+                    if (o && typeof o === 'object' && !Array.isArray(o)) {
+                        var keys = Object.keys(o), hit = 0;
+                        ['sites', 'lives', 'parses', 'spider'].forEach(function (k) { if (keys.indexOf(k) >= 0) hit++; });
+                        out.score = 60 + hit * 10;
+                    }
+                } catch (e) { /* 不是 JSON，保持 20 分 */ }
+            }
+            return out;
+        }
+
+        // ---------- 链生成（步骤不重复，长度 1..3）----------
+        function genChains(steps, maxLen) {
+            var res = [];
+            (function rec(cur, used) {
+                if (cur.length) res.push(cur.slice());
+                if (cur.length === maxLen) return;
+                for (var i = 0; i < steps.length; i++) {
+                    if (used[i]) continue;
+                    used[i] = true; cur.push(steps[i]);
+                    rec(cur, used);
+                    cur.pop(); used[i] = false;
+                }
+            })([], []);
+            return res;
+        }
+
+        // ---------- 密钥 / IV 候选 ----------
+        function buildKeyCands(key) {
+            if (!key) return [];
+            var out = [['原文', CryptoJS.enc.Utf8.parse(key)]];
+            var b = new TextEncoder().encode(key);
+            if (b.length !== 16 && b.length !== 24 && b.length !== 32) {
+                var lens = [16, 24, 32], fit = 32;
+                for (var i = 0; i < lens.length; i++) if (b.length <= lens[i]) { fit = lens[i]; break; }
+                var o = new Uint8Array(fit); o.set(b.subarray(0, fit));
+                out.push(['补\\0→' + fit + 'B', bytesToWA(o)]);
+            }
+            // TVBox 惯例：用字符 '0' 右补齐（与补 \0 字节不同），必须单独试
+            if (key.length < 16) out.push(["补'0'→16B", CryptoJS.enc.Utf8.parse(key + new Array(17 - key.length).join('0'))]);
+            if (key.length < 32) out.push(["补'0'→32B", CryptoJS.enc.Utf8.parse(key + new Array(33 - key.length).join('0'))]);
+            out.push(['MD5(16B)', CryptoJS.MD5(key)]);
+            out.push(['MD5-Hex(32B)', CryptoJS.enc.Utf8.parse(CryptoJS.MD5(key).toString(CryptoJS.enc.Hex))]);
+            out.push(['SHA256(32B)', CryptoJS.SHA256(key)]);
+            if (/^[0-9a-fA-F]+$/.test(key) && [32, 48, 64].indexOf(key.length) >= 0) {
+                out.push(['Hex原文', CryptoJS.enc.Hex.parse(key)]);
+            }
+            return out;
+        }
+        function buildIvCands(iv, mode) {
+            if (mode === 'ECB') return [['无', null]];
+            var out = [];
+            if (iv) {
+                var b = new TextEncoder().encode(iv);
+                if (b.length === 16) out.push(['原文', CryptoJS.enc.Utf8.parse(iv)]);
+                var o = new Uint8Array(16); o.set(b.subarray(0, 16));
+                out.push(['补\\0→16B', bytesToWA(o)]);
+                if (iv.length < 16) out.push(["补'0'→16B", CryptoJS.enc.Utf8.parse(iv + new Array(17 - iv.length).join('0'))]);
+            }
+            out.push(['全零', CryptoJS.enc.Hex.parse('00000000000000000000000000000000')]);
+            return out;
+        }
+
+        async function runOneChain(chain, input, opt) {
+            var cur = input;
+            for (var i = 0; i < chain.length; i++) {
+                var s = chain[i];
+                if (s === 'b64') { cur = tryB64Step(cur); }
+                else if (s === 'gunzip') { cur = await tryGunzipStep(cur); }
+                else if (s === 'aes') { cur = tryAesStep(cur, opt); }
+                if (!cur) return null;
+            }
+            return cur;
+        }
+
+        // ---------- 主流程 ----------
+        async function runDecryptChain() {
+            var text = document.getElementById('chainInput').value;
+            if (!text || !text.trim()) { setChainStatus('请先粘贴内容或选择文件', 'error'); return; }
+            if (typeof CryptoJS === 'undefined') { setChainStatus('CryptoJS 未加载', 'error'); return; }
+
+            var key = document.getElementById('chainKey').value || '';
+            var iv = document.getElementById('chainIv').value || '';
+            var mode = document.getElementById('chainMode').value;
+
+            var btn = document.querySelector('button[onclick="runDecryptChain()"]');
+            if (btn) btn.disabled = true;
+            setChainStatus('', '');
+            document.getElementById('chainOutput').value = '';
+
+            // 阶段 0：文本级预处理候选
+            var preCands = [{ label: '原文', bytes: u8(text) }];
+            var t2 = unescapeAllText(text);
+            if (t2 !== text) preCands.push({ label: 'Unicode还原', bytes: u8(t2) });
+            var jb = extractJsonBlock(t2);
+            if (jb) preCands.push({ label: '抽取JSON', bytes: u8(jb) });
+            // 自描述加密（$#pwdHex#$密文Hex + 26位时间戳Hex）：密钥内嵌，无需手填 Key/IV
+            if (text.indexOf('$#') !== -1 && text.indexOf('#$') !== -1 && typeof decryptAesBCB === 'function') {
+                var sd = decryptAesBCB(text);
+                if (sd) preCands.push({ label: '自描述解密', bytes: u8(sd) });
+            }
+            var sd2 = selfDescDecrypt(text);
+            if (sd2) preCands.push({ label: '自描述解密(严格)', bytes: u8(sd2) });
+            // 纯 Hex 密文 + TVBox 常见默认密钥（页面内置的那几组）
+            var hexClean = text.replace(/[\s\r\n]/g, '');
+            if (/^[0-9a-fA-F]+$/.test(hexClean) && typeof decryptHexWithKeyIv === 'function') {
+                var combos = [
+                    { key: 'Jsnzkpg', iv: '0000000000000' },
+                    { key: 'Jsnzkpg', iv: '1514227500000' },
+                    { key: 'dhvdtin', iv: '1514227500000' },
+                    { key: '123456', iv: '0000000000000' }
+                ];
+                for (var ci = 0; ci < combos.length; ci++) {
+                    var hp = decryptHexWithKeyIv(hexClean, combos[ci].key, combos[ci].iv);
+                    if (hp) preCands.push({ label: '默认密钥 ' + combos[ci].key, bytes: u8(hp) });
+                }
+            }
+
+            var best = { score: -1 };
+            var tried = 0;
+            var STEPS = ['b64', 'aes', 'gunzip'];
+            var allChains = genChains(STEPS, 3);
+            var noAesChains = allChains.filter(function (c) { return c.indexOf('aes') < 0; });
+            var aesChains = allChains.filter(function (c) { return c.indexOf('aes') >= 0; });
+
+            function pick(r, chainLabel, extra, raw) {
+                var e = evalResult(r);
+                if (e.score > best.score) {
+                    best = {
+                        score: e.score, text: e.text, obj: e.obj, raw: !!raw,
+                        label: chainLabel + (extra ? ' · ' + extra : '')
+                    };
+                }
+                return e.score;
+            }
+
+            // 阶段 1：不含 AES 的链（快，且能直接命中明文 JSON）
+            setChainProgress('阶段 1/2：尝试 Base64 / Gzip 组合…');
+            for (var p = 0; p < preCands.length; p++) {
+                pick(preCands[p].bytes, '原文直接解析', preCands[p].label, true);
+                for (var c = 0; c < noAesChains.length; c++) {
+                    tried++;
+                    var r = await runOneChain(noAesChains[c], preCands[p].bytes, null);
+                    if (r) {
+                        var sc = pick(r, noAesChains[c].join('→'), preCands[p].label);
+                        if (sc >= 100) break;
+                    }
+                }
+                if (best.score >= 100) break;
+            }
+
+            // 阶段 2：含 AES 的链
+            if (best.score < 100) {
+                var keyCands = buildKeyCands(key);
+                var ivCands = buildIvCands(iv, mode);
+                if (!keyCands.length) {
+                    setChainStatus(best.score >= 60 ? '' : '未填 Key，只能尝试不含 AES 的链。若内容是加密的，请填写 Key', best.score >= 60 ? 'success' : 'error');
+                } else {
+                    setChainProgress('阶段 2/2：尝试 AES 组合（' + keyCands.length + ' 种 Key × ' + ivCands.length + ' 种 IV）…');
+                    var total = preCands.length * aesChains.length * keyCands.length * ivCands.length;
+                    var done = 0;
+                    outer:
+                    for (var p2 = 0; p2 < preCands.length; p2++) {
+                        for (var c2 = 0; c2 < aesChains.length; c2++) {
+                            for (var k = 0; k < keyCands.length; k++) {
+                                for (var v = 0; v < ivCands.length; v++) {
+                                    tried++; done++;
+                                    if (done % 40 === 0) {
+                                        setChainProgress('阶段 2/2：AES 尝试 ' + done + '/' + total + '…');
+                                        await new Promise(function (r2) { setTimeout(r2, 0); });
+                                    }
+                                    var opt = { key: keyCands[k][1], iv: ivCands[v][1], mode: mode };
+                                    var r2 = await runOneChain(aesChains[c2], preCands[p2].bytes, opt);
+                                    if (r2) {
+                                        var sc2 = pick(r2, aesChains[c2].join('→'),
+                                            preCands[p2].label + ' · Key ' + keyCands[k][0] + ' · IV ' + ivCands[v][0]);
+                                        if (sc2 >= 100) break outer;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (btn) btn.disabled = false;
+            setChainProgress('');
+
+            var outEl = document.getElementById('chainOutput');
+            if (best.score < 20) {
+                setChainStatus('没能解出可读内容（共尝试 ' + tried + ' 种组合）。请检查：① 内容是否完整 ② Key / IV 是否正确 ③ 是否走了代理才拉得到', 'error');
+                return;
+            }
+            // 只解到"原文可读文本"而没识别出 JSON：说明其实什么都没解开
+            if (best.raw && !best.obj) {
+                document.getElementById('chainOutput').value = best.text;
+                setChainStatus('⚠️ 未能解密出 JSON 配置（共试 ' + tried + ' 种组合），下方是原样内容。若确实是加密串，请填写正确的 Key / IV；若本就是普通文本，可忽略。', 'error');
+                return;
+            }
+
+            var shown = best.text;
+            if (best.obj) {
+                try { shown = JSON.stringify(best.obj, null, 2); } catch (e) { /* 保持原样 */ }
+            }
+            outEl.value = shown;
+
+            var desc = '链路：' + (best.label || '—');
+            if (best.obj && !Array.isArray(best.obj)) {
+                var ks = Object.keys(best.obj);
+                var info = [];
+                if (best.obj.sites) info.push(best.obj.sites.length + ' 站点');
+                if (best.obj.lives) info.push(best.obj.lives.length + ' 直播');
+                if (best.obj.parses) info.push(best.obj.parses.length + ' 解析');
+                desc += '　→　' + (info.length ? info.join(' / ') : 'JSON（' + ks.length + ' 个顶层键）');
+            } else {
+                desc += '　→　' + shown.length + ' 字符文本';
+            }
+            setChainStatus('✅ ' + desc + '（共试 ' + tried + ' 种组合）', 'success');
+        }
+
+        // ---------- 输入来源 ----------
+        function loadChainFile(input) {
+            var f = input.files && input.files[0];
+            if (!f) return;
+            var fr = new FileReader();
+            fr.onload = function () {
+                document.getElementById('chainInput').value = String(fr.result || '');
+                setChainStatus('已读入：' + f.name + '（' + f.size + ' 字节），点「一键解密」开始', 'info');
+            };
+            fr.onerror = function () { setChainStatus('文件读取失败', 'error'); };
+            fr.readAsText(f, 'utf-8');
+            input.value = '';
+        }
+        async function loadChainUrl() {
+            var url = document.getElementById('chainUrl').value.trim();
+            if (!url) { setChainStatus('请填写 URL', 'error'); return; }
+            if (!/^https?:\/\//i.test(url)) { setChainStatus('URL 需以 http:// 或 https:// 开头', 'error'); return; }
+            setChainStatus('拉取中…', 'info');
+            // 复用页面已有的代理设置
+            var target = url;
+            try {
+                if (typeof getProxyTarget === 'function') target = getProxyTarget(url);
+            } catch (e) { /* 无代理函数则直连 */ }
+            try {
+                var r = await fetch(target, { cache: 'no-store' });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                var t = await r.text();
+                document.getElementById('chainInput').value = t;
+                setChainStatus('已拉取 ' + t.length + ' 字符，点「一键解密」开始', 'success');
+            } catch (e) {
+                setChainStatus('拉取失败：' + e.message + '（若报 CORS / 混合内容，请打开页面顶部的代理开关）', 'error');
+            }
+        }
+        function clearChain() {
+            document.getElementById('chainInput').value = '';
+            document.getElementById('chainOutput').value = '';
+            document.getElementById('chainProgress').textContent = '';
+            setChainStatus('', '');
+        }
+
+        // ---------- 结果处理 ----------
+        function importChainResult() {
+            var t = document.getElementById('chainOutput').value;
+            if (!t) { setChainStatus('没有可导入的结果', 'error'); return; }
+            var obj;
+            try { obj = JSON.parse(t); }
+            catch (e) { setChainStatus('结果不是合法 JSON：' + e.message, 'error'); return; }
+            if (typeof applyConfigToUI !== 'function') { setChainStatus('导入函数不可用', 'error'); return; }
+            var ok = applyConfigToUI(obj);
+            if (ok) {
+                var n = [];
+                n.push((obj.sites || []).length + ' 站点');
+                n.push((obj.lives || []).length + ' 直播');
+                n.push((obj.parses || []).length + ' 解析');
+                setChainStatus('✅ 已导入到配置生成器：' + n.join(' / '), 'success');
+            } else {
+                setChainStatus('导入失败：配置格式有误', 'error');
+            }
+        }
+        function copyChainResult() {
+            var t = document.getElementById('chainOutput').value;
+            if (!t) { setChainStatus('没有可复制的内容', 'error'); return; }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(t).then(function () { setChainStatus('已复制到剪贴板', 'success'); },
+                    function () { fallbackCopy(t); });
+            } else fallbackCopy(t);
+        }
+        function fallbackCopy(t) {
+            try {
+                var ta = document.createElement('textarea');
+                ta.value = t; document.body.appendChild(ta); ta.select();
+                document.execCommand('copy'); document.body.removeChild(ta);
+                setChainStatus('已复制到剪贴板', 'success');
+            } catch (e) { setChainStatus('复制失败', 'error'); }
+        }
+        function downloadChainResult() {
+            var t = document.getElementById('chainOutput').value;
+            if (!t) { setChainStatus('没有可下载的内容', 'error'); return; }
+            var blob = new Blob([t], { type: 'application/json' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'tvbox-decrypted.json';
+            document.body.appendChild(a); a.click();
+            setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+            setChainStatus('已下载 tvbox-decrypted.json', 'success');
+        }
+
+        function saveChainKeys() {
+            try {
+                localStorage.setItem('tvbox_chain_key', document.getElementById('chainKey').value || '');
+                localStorage.setItem('tvbox_chain_iv', document.getElementById('chainIv').value || '');
+                setChainStatus('已记住 Key / IV', 'success');
+            } catch (e) { setChainStatus('浏览器不允许本地存储', 'error'); }
+        }
+        function initChain() {
+            try {
+                var k = localStorage.getItem('tvbox_chain_key');
+                var v = localStorage.getItem('tvbox_chain_iv');
+                if (k) document.getElementById('chainKey').value = k;
+                if (v) document.getElementById('chainIv').value = v;
+            } catch (e) { /* 忽略 */ }
+        }
+
+        // ============================================================
+        //  实用工具：Base64 / AES / Gzip / JS美化 / 本机IP / Jar
+        // ============================================================
+
+        function setToolStatus(msg, type) {
+            var el = document.getElementById('toolStatus');
+            if (!el) return;
+            el.textContent = msg || '';
+            el.className = 'status-msg' + (type ? ' status-' + type : '');
+            el.style.display = msg ? 'block' : 'none';
+        }
+
+        // ---- UTF-8 安全的 Base64 ----
+        function utf8ToB64(str) {
+            var bytes = new TextEncoder().encode(str);
+            var bin = '';
+            for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+            return btoa(bin);
+        }
+        function b64ToUtf8(b64) {
+            var bin = atob(b64.replace(/\s+/g, ''));
+            var bytes = new Uint8Array(bin.length);
+            for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return new TextDecoder().decode(bytes);
+        }
+        function isLikelyB64(s) {
+            s = (s || '').trim();
+            if (s.length < 4 || s.length % 4 !== 0) return false;
+            return /^[A-Za-z0-9+/=]+$/.test(s);
+        }
+
+        function b64Encode() {
+            var v = document.getElementById('b64Input').value;
+            if (!v) return setToolStatus('请先输入内容', 'error');
+            try {
+                document.getElementById('b64Output').value = utf8ToB64(v);
+                setToolStatus('已编码 ' + v.length + ' 字符', 'success');
+            } catch (e) { setToolStatus('编码失败：' + e.message, 'error'); }
+        }
+        function b64Decode() {
+            var v = document.getElementById('b64Input').value.trim();
+            if (!v) return setToolStatus('请先输入 Base64 内容', 'error');
+            try {
+                document.getElementById('b64Output').value = b64ToUtf8(v);
+                setToolStatus('解码成功', 'success');
+            } catch (e) { setToolStatus('解码失败，可能不是合法 Base64：' + e.message, 'error'); }
+        }
+
+        // ---- AES 解密 ----
+        function bytesToHex(u8) {
+            var h = '';
+            for (var i = 0; i < u8.length; i++) h += ('0' + u8[i].toString(16)).slice(-2);
+            return h;
+        }
+        function utf8Bytes(s) { return new TextEncoder().encode(s); }
+        function bytesToWA(u8) { return CryptoJS.enc.Hex.parse(bytesToHex(u8)); }
+        // 补齐/截断到合法 AES 密钥长度（16/24/32 字节）
+        function fitKeyBytes(u8) {
+            var lens = [16, 24, 32];
+            for (var i = 0; i < lens.length; i++) {
+                if (u8.length <= lens[i]) {
+                    var o = new Uint8Array(lens[i]);
+                    o.set(u8.subarray(0, lens[i]));
+                    return o;
+                }
+            }
+            return u8.subarray(0, 32);
+        }
+        function isPlausibleText(s) {
+            if (!s || !s.length) return false;
+            var bad = 0;
+            for (var i = 0; i < s.length; i++) {
+                var c = s.charCodeAt(i);
+                if (c === 0xFFFD) { bad++; continue; }
+                if (c < 0x20 && c !== 9 && c !== 10 && c !== 13) { bad++; continue; }
+                if (c >= 0x80 && c <= 0x9F) bad++;
+            }
+            return bad / s.length < 0.05;
+        }
+
+        function aesDecryptTool() {
+            var key = document.getElementById('aesKey').value;
+            var iv = document.getElementById('aesIv').value || '';
+            var mode = document.getElementById('aesMode').value;
+            var fmt = document.getElementById('aesFmt').value;
+            var ct = document.getElementById('aesInput').value.trim().replace(/\s+/g, '');
+            var out = document.getElementById('aesOutput');
+            if (typeof CryptoJS === 'undefined') return setToolStatus('CryptoJS 未加载', 'error');
+            if (!key) return setToolStatus('请填写 Key', 'error');
+            if (!ct) return setToolStatus('请粘贴密文', 'error');
+
+            // 密文候选（指定的格式优先，另一种兜底）
+            var ctCands = [];
+            if (fmt === 'hex') {
+                ctCands.push(['hex', CryptoJS.enc.Hex.parse(ct)]);
+                if (/^[A-Za-z0-9+/=]+$/.test(ct)) ctCands.push(['base64', CryptoJS.enc.Base64.parse(ct)]);
+            } else {
+                ctCands.push(['base64', CryptoJS.enc.Base64.parse(ct)]);
+                if (/^[0-9a-fA-F]+$/.test(ct)) ctCands.push(['hex', CryptoJS.enc.Hex.parse(ct)]);
+            }
+
+            // 密钥候选：原始 → 补零/截断 → MD5(16B) → MD5 hex(32B) → SHA256(32B) → Hex 原样
+            var kb = utf8Bytes(key);
+            var kCands = [
+                ['原文(' + kb.length + 'B)', CryptoJS.enc.Utf8.parse(key)]
+            ];
+            if (kb.length !== 16 && kb.length !== 24 && kb.length !== 32) {
+                kCands.push(['补零/截断→' + (kb.length < 32 ? (kb.length <= 16 ? 16 : kb.length <= 24 ? 24 : 32) : 32) + 'B',
+                    bytesToWA(fitKeyBytes(kb))]);
+            }
+            kCands.push(['MD5(16B)', CryptoJS.MD5(key)]);
+            kCands.push(['MD5-Hex(32B)', CryptoJS.enc.Utf8.parse(CryptoJS.MD5(key).toString(CryptoJS.enc.Hex))]);
+            kCands.push(['SHA256(32B)', CryptoJS.SHA256(key)]);
+            if (/^[0-9a-fA-F]+$/.test(key) && [32, 48, 64].indexOf(key.length) >= 0) {
+                kCands.push(['Hex原文', CryptoJS.enc.Hex.parse(key)]);
+            }
+
+            // IV 候选
+            var iCands = [];
+            if (mode === 'ECB') {
+                iCands.push(['无', null]);
+            } else {
+                var ib = utf8Bytes(iv);
+                if (iv) {
+                    if (ib.length === 16) iCands.push(['原文', CryptoJS.enc.Utf8.parse(iv)]);
+                    var fited = new Uint8Array(16);
+                    fited.set(ib.subarray(0, 16));
+                    iCands.push(['补零/截断→16B', bytesToWA(fited)]);
+                }
+                iCands.push(['全零', CryptoJS.enc.Hex.parse('00000000000000000000000000000000')]);
+            }
+
+            var tried = 0;
+            for (var a = 0; a < ctCands.length; a++) {
+                for (var k = 0; k < kCands.length; k++) {
+                    for (var v = 0; v < iCands.length; v++) {
+                        tried++;
+                        try {
+                            var opt = {
+                                mode: mode === 'ECB' ? CryptoJS.mode.ECB : CryptoJS.mode.CBC,
+                                padding: CryptoJS.pad.Pkcs7
+                            };
+                            if (mode !== 'ECB' && iCands[v][1]) opt.iv = iCands[v][1];
+                            var plain = CryptoJS.AES.decrypt({ ciphertext: ctCands[a][1] }, kCands[k][1], opt);
+                            var str = plain.toString(CryptoJS.enc.Utf8);
+                            if (str && isPlausibleText(str)) {
+                                try {
+                                    var o = JSON.parse(str);
+                                    if (o && typeof o === 'object') str = JSON.stringify(o, null, 2);
+                                } catch (_) {}
+                                out.value = str;
+                                var note = '密文 ' + ctCands[a][0] + ' · ' + mode + ' · Key ' + kCands[k][0] + (mode !== 'ECB' ? ' · IV ' + iCands[v][0] : '');
+                                var warn = '';
+                                if (kb.length !== 16 && kb.length !== 24 && kb.length !== 32) {
+                                    warn = '（注意：Key 原文为 ' + kb.length + ' 字节，非标准 16/24/32，已自动换算）';
+                                }
+                                setToolStatus('解密成功：' + note + warn, 'success');
+                                return;
+                            }
+                        } catch (e) { /* 换下一种组合 */ }
+                    }
+                }
+            }
+            var hint = '解密失败：已尝试 ' + tried + ' 种组合';
+            if (kb.length !== 16 && kb.length !== 24 && kb.length !== 32) {
+                hint += '；Key 原文 ' + kb.length + ' 字节非标准长度（应为 16/24/32）';
+            }
+            hint += '。请核对 Key / IV / 模式 / 密文格式';
+            setToolStatus(hint, 'error');
+        }
+
+        // ---- Gzip 解码 ----
+        function b64ToBytes(b64) {
+            var bin = atob(b64.replace(/\s+/g, ''));
+            var bytes = new Uint8Array(bin.length);
+            for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return bytes;
+        }
+        async function gunzipBytes(bytes) {
+            if (typeof DecompressionStream === 'undefined') throw new Error('当前浏览器不支持 DecompressionStream，请用新版 Chrome/Edge/Safari');
+            var ds = new DecompressionStream('gzip');
+            var blob = new Blob([bytes]);
+            var stream = blob.stream().pipeThrough(ds);
+            return new Uint8Array(await new Response(stream).arrayBuffer());
+        }
+        async function gzipDecodeTool() {
+            var v = document.getElementById('gzipInput').value.trim();
+            if (!v) return setToolStatus('请先粘贴 Gzip 的 Base64 数据', 'error');
+            setToolStatus('解压中…', 'info');
+            try {
+                var out = await gunzipBytes(b64ToBytes(v));
+                var text = new TextDecoder('utf-8').decode(out);
+                try {
+                    var o = JSON.parse(text);
+                    if (o && typeof o === 'object') text = JSON.stringify(o, null, 2);
+                } catch (_) {}
+                document.getElementById('gzipOutput').value = text;
+                setToolStatus('解压成功，共 ' + out.length + ' 字节', 'success');
+            } catch (e) {
+                setToolStatus('解压失败：' + e.message, 'error');
+            }
+        }
+
+        // ---- JS / JSON 美化与压缩 ----
+        function simpleBeautify(src) {
+            var out = '', indent = 0, i = 0, n = src.length;
+            var inStr = null, inLine = false, inBlock = false, esc = false, ch, prev = '';
+            function pad() { var s = ''; for (var j = 0; j < indent; j++) s += '    '; return s; }
+            while (i < n) {
+                ch = src[i];
+                if (inLine) { if (ch === '\n') { inLine = false; out += '\n'; } i++; continue; }
+                if (inBlock) { if (ch === '*' && src[i + 1] === '/') { inBlock = false; out += '*/'; i += 2; continue; } out += ch; i++; continue; }
+                if (inStr) {
+                    out += ch;
+                    if (esc) esc = false;
+                    else if (ch === '\\') esc = true;
+                    else if (ch === inStr) inStr = null;
+                    i++; continue;
+                }
+                if (ch === '/' && src[i + 1] === '/') { inLine = true; i += 2; continue; }
+                if (ch === '/' && src[i + 1] === '*') { inBlock = true; out += '/*'; i += 2; continue; }
+                if (ch === '"' || ch === "'" || ch === '`') { inStr = ch; out += ch; i++; continue; }
+                if (ch === '{' || ch === '[') {
+                    out += ch + '\n' + pad() + '    ';
+                    indent++;
+                    i++;
+                    while (i < n && /\s/.test(src[i])) i++;
+                    continue;
+                }
+                if (ch === '}' || ch === ']') {
+                    indent = Math.max(0, indent - 1);
+                    var tail = out.replace(/\s+$/, '');
+                    out = tail + '\n' + pad() + ch;
+                    i++;
+                    continue;
+                }
+                if (ch === ',') { out += ',\n' + pad(); i++; while (i < n && src[i] === ' ') i++; continue; }
+                if (ch === ';') { out += ';\n' + pad(); i++; while (i < n && src[i] === ' ') i++; continue; }
+                if (/\s/.test(ch)) {
+                    if (prev && !/\s/.test(prev)) out += ch === '\n' ? '\n' + pad() : ch;
+                    i++; prev = ch; continue;
+                }
+                out += ch; prev = ch; i++;
+            }
+            return out.replace(/\n{3,}/g, '\n\n').replace(/[ \t]+$/gm, '');
+        }
+
+        function beautifyTool() {
+            var raw = document.getElementById('jsInput').value.trim();
+            if (!raw) return setToolStatus('请先粘贴 JS 或 JSON', 'error');
+            var src = raw, decoded = false;
+            // 整体是 Base64 就先解一层
+            if (isLikelyB64(raw) && !/^[\{\[]/.test(raw)) {
+                try { src = b64ToUtf8(raw); decoded = true; } catch (_) {}
+            }
+            // gzip 过的数据（base64 解出来是 gzip 魔数）再解压一层
+            if (decoded === false) { /* noop */ }
+            try {
+                var o = JSON.parse(src);
+                document.getElementById('jsOutput').value = JSON.stringify(o, null, 4);
+                setToolStatus(decoded ? '已是 JSON（自动解了一层 Base64）' : 'JSON 格式化完成', 'success');
+                return;
+            } catch (_) {}
+            try {
+                document.getElementById('jsOutput').value = simpleBeautify(src);
+                setToolStatus(decoded ? '已自动 Base64 解码并格式化' : 'JS 格式化完成（简易美化器）', 'success');
+            } catch (e) { setToolStatus('格式化失败：' + e.message, 'error'); }
+        }
+
+        function minifyTool() {
+            var raw = document.getElementById('jsInput').value.trim();
+            if (!raw) return setToolStatus('请先粘贴 JS 或 JSON', 'error');
+            var src = raw;
+            if (isLikelyB64(raw) && !/^[\{\[]/.test(raw)) {
+                try { src = b64ToUtf8(raw); } catch (_) {}
+            }
+            try {
+                document.getElementById('jsOutput').value = JSON.stringify(JSON.parse(src));
+                setToolStatus('JSON 已压缩', 'success');
+                return;
+            } catch (_) {}
+            // 保守压缩：去掉注释与多余空白（保留字符串内部）
+            var out = '', i = 0, n = src.length, inStr = null, inLine = false, inBlock = false, esc = false, ch;
+            while (i < n) {
+                ch = src[i];
+                if (inLine) { if (ch === '\n') { inLine = false; out += '\n'; } i++; continue; }
+                if (inBlock) { if (ch === '*' && src[i + 1] === '/') { inBlock = false; i += 2; continue; } i++; continue; }
+                if (inStr) {
+                    out += ch;
+                    if (esc) esc = false;
+                    else if (ch === '\\') esc = true;
+                    else if (ch === inStr) inStr = null;
+                    i++; continue;
+                }
+                if (ch === '/' && src[i + 1] === '/') { inLine = true; i += 2; continue; }
+                if (ch === '/' && src[i + 1] === '*') { inBlock = true; i += 2; continue; }
+                if (ch === '"' || ch === "'" || ch === '`') { inStr = ch; out += ch; i++; continue; }
+                if (/[ \t\r\n]/.test(ch)) {
+                    var last = out[out.length - 1];
+                    var next = src[i + 1] || '';
+                    if (last && next && /[A-Za-z0-9_$]/.test(last) && /[A-Za-z0-9_$]/.test(next)) out += ' ';
+                    i++; continue;
+                }
+                out += ch; i++;
+            }
+            document.getElementById('jsOutput').value = out.replace(/\n{2,}/g, '\n').trim();
+            setToolStatus('已压缩：' + src.length + ' → ' + out.length + ' 字符', 'success');
+        }
 
         renderSites();
         renderLives();
