@@ -1,616 +1,256 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>全能日记本 | 画板画作列表+日记背景</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        body {
-            background: #eef2f8;
-            font-family: system-ui, 'Segoe UI', 'Roboto', 'Noto Sans', sans-serif;
-            overflow: hidden;
-            height: 100vh;
-            width: 100vw;
-            position: fixed;
-        }
-
-        .app-screens {
-            width: 100%;
-            height: 100%;
-            overflow-y: auto;
-            overflow-x: hidden;
-            scroll-snap-type: y proximity;
-            scroll-behavior: smooth;
-        }
-
-        .full-page {
-            width: 100%;
-            min-height: 100vh;
-            scroll-snap-align: start;
-            background: #ffffff;
-            display: flex;
-            flex-direction: column;
-            padding: 20px 18px 30px 18px;
-        }
-
-        .page-draw { background: #fefefe; }
-        .page-list { background: #f9fafc; }
-        .page-view { background: #fffdf7; transition: background 0.2s; }
-        .page-gallery { background: #f5f7fc; }  /* 新增画作画廊页 */
-
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            margin-bottom: 20px;
-            padding-bottom: 12px;
-            border-bottom: 2px solid #eef2f8;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .page-header h2 {
-            font-size: 1.8rem;
-            font-weight: 640;
-            background: linear-gradient(135deg, #1e3c72, #2a5298);
-            background-clip: text;
-            -webkit-background-clip: text;
-            color: transparent;
-        }
-        .sub-action {
-            font-size: 0.8rem;
-            color: #3b82f6;
-            background: #eef3ff;
-            padding: 6px 14px;
-            border-radius: 40px;
-            cursor: pointer;
-        }
-
-        /* 画板工具栏 */
-        .canvas-toolbar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            align-items: center;
-            background: #ffffffdd;
-            backdrop-filter: blur(8px);
-            padding: 12px 16px;
-            border-radius: 60px;
-            border: 1px solid #e2edf7;
-            margin-bottom: 12px;
-        }
-        .tool-group {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            background: #f8fafd;
-            padding: 6px 14px;
-            border-radius: 40px;
-        }
-        .tool-btn {
-            background: white;
-            border: 1px solid #dce5f0;
-            padding: 6px 12px;
-            border-radius: 32px;
-            font-size: 0.8rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: 0.1s;
-        }
-        .tool-btn.active {
-            background: #1e6fdf;
-            color: white;
-            border-color: #1e6fdf;
-        }
-        canvas {
-            background: white;
-            border-radius: 32px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-            width: 100%;
-            aspect-ratio: 3 / 4;
-            cursor: crosshair;
-            touch-action: none;
-            border: 1px solid #eef2fa;
-        }
-        input[type="color"] { width: 40px; height: 40px; border-radius: 40px; border: 1px solid #ccc; cursor: pointer; }
-        input[type="range"] { width: 110px; }
-
-        /* 日记列表样式 */
-        .diary-list, .artwork-list {
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 18px;
-            padding-bottom: 30px;
-        }
-        .diary-card, .artwork-card {
-            background: white;
-            border-radius: 28px;
-            padding: 18px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
-            border: 1px solid #eef3fc;
-            cursor: pointer;
-        }
-        .diary-title, .artwork-title {
-            font-size: 1.3rem;
-            font-weight: 700;
-            display: flex;
-            justify-content: space-between;
-        }
-        .artwork-preview {
-            width: 100%;
-            height: 140px;
-            margin: 12px 0;
-            border-radius: 20px;
-            overflow: hidden;
-            background: #f0f2f5;
-        }
-        .artwork-preview img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .diary-meta, .artwork-meta {
-            font-size: 0.7rem;
-            color: #7c8ba0;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        /* 日记查看页 */
-        .bg-selector {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-bottom: 16px;
-            background: #f0f4fa;
-            padding: 10px;
-            border-radius: 60px;
-        }
-        .bg-option {
-            width: 44px;
-            height: 44px;
-            border-radius: 44px;
-            cursor: pointer;
-            border: 2px solid transparent;
-            transition: 0.1s;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        }
-        .bg-option.active { border-color: white; outline: 2px solid #1e6fdf; transform: scale(1.02);}
-        .view-container {
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .view-title-input, .view-content-textarea {
-            font-family: inherit;
-            border: 1px solid #e2edf7;
-            background: rgba(255,255,255,0.9);
-            border-radius: 28px;
-            padding: 14px 18px;
-            width: 100%;
-            font-size: 1rem;
-        }
-        .view-title-input { font-size: 1.7rem; font-weight: 700; }
-        .view-content-textarea { min-height: 35vh; line-height: 1.5; resize: vertical; }
-        .delete-view-btn {
-            background: #fff0ed;
-            color: #c2410c;
-            border: none;
-            padding: 12px;
-            border-radius: 60px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 12px;
-        }
-        .inline-save-tip { font-size: 0.7rem; color: #2e7d32; background: #e8f5e9; padding: 6px 12px; border-radius: 40px; display: inline-block; }
-
-        /* 底部导航 */
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background: rgba(255,255,255,0.96);
-            backdrop-filter: blur(20px);
-            display: flex;
-            justify-content: space-around;
-            padding: 10px 20px 22px;
-            border-top: 1px solid #eef2f0;
-            z-index: 200;
-        }
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            font-size: 0.7rem;
-            color: #8a99b0;
-            background: none;
-            border: none;
-            cursor: pointer;
-        }
-        .nav-item.active { color: #1e6fdf; transform: translateY(-2px); }
-        .nav-icon { font-size: 1.7rem; }
-
-        /* 模态框 */
-        .modal-mask {
-            display: none;
-            position: fixed;
-            top:0;left:0;width:100%;height:100%;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(6px);
-            justify-content: center;
-            align-items: center;
-            z-index: 300;
-        }
-        .modal-card {
-            background: white;
-            width: 86%;
-            max-width: 400px;
-            border-radius: 48px;
-            padding: 28px 24px;
-        }
-        .modal-card input, .modal-card textarea {
-            width: 100%;
-            margin: 12px 0;
-            padding: 14px;
-            border-radius: 32px;
-            border: 1px solid #dce5f0;
-        }
-        .empty-state { text-align: center; padding: 60px 20px; color: #9aaebf; }
-        @media (max-width: 600px) { .full-page { padding: 18px 14px 28px; } }
-    </style>
+<meta charset="UTF-8">
+<title>本地JSON工具 - TVBox｜完整jsonrepair单离线文件</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,sans-serif}
+:root{
+  --bg:#f5f6f7;
+  --text:#222;
+  --panel-bg:#fff;
+  --panel-border:#ddd;
+  --panel-header:#eef2ff;
+  --input-bg:#fff;
+  --tree-key:#92400e;
+  --tree-string:#16a34a;
+  --tree-num:#2563eb;
+  --tree-bool:#7c3aed;
+  --tree-null:#888;
+}
+.dark{
+  --bg:#1e1e1e;
+  --text:#e0e0e0;
+  --panel-bg:#2d2d2d;
+  --panel-border:#444;
+  --panel-header:#333842;
+  --input-bg:#252526;
+  --tree-key:#ffc66d;
+  --tree-string:#a5d6ff;
+  --tree-num:#4ec9b0;
+  --tree-bool:#c586c0;
+  --tree-null:#8a8a8a;
+}
+body{padding:16px;background:var(--bg);color:var(--text);transition:0.2s}
+.container{max-width:1400px;margin:0 auto}
+.top-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+button{padding:8px 14px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-size:14px}
+button.secondary{background:#666}
+button.danger{background:#dc2626}
+button.fix{background:#059669;}
+.wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;height:calc(100vh - 140px)}
+.panel{display:flex;flex-direction:column;background:var(--panel-bg);border-radius:8px;overflow:hidden;border:1px solid var(--panel-border)}
+.panel h3{padding:10px;background:var(--panel-header);margin:0;font-size:15px;color:var(--text)}
+textarea{flex:1;width:100%;padding:12px;border:none;outline:none;font-family:Consolas,monospace;font-size:13px;resize:none;background:var(--input-bg);color:var(--text)}
+#tree{flex:1;padding:12px;overflow:auto;font-family:Consolas;font-size:13px;background:var(--panel-bg);color:var(--text)}
+.error{color:#ff4d4f;font-weight:bold;margin:8px 0}
+.success{color:#36d399;font-weight:bold;margin:8px 0}
+.tree-key{color:var(--tree-key)}
+.tree-string{color:var(--tree-string)}
+.tree-num{color:var(--tree-num)}
+.tree-bool{color:var(--tree-bool)}
+.tree-null{color:var(--tree-null)}
+</style>
 </head>
 <body>
-
-<div class="app-screens" id="appScreens">
-    <!-- 页面1: 画板 -->
-    <div class="full-page page-draw" id="pageDraw">
-        <div class="page-header">
-            <h2>🎨 专业画板</h2>
-            <div class="sub-action" id="clearDrawBtn">清空画板</div>
-        </div>
-        <div class="canvas-toolbar">
-            <div class="tool-group">
-                <span>✏️</span>
-                <input type="color" id="penColor" value="#1e293b">
-                <span id="colorPreview" style="width:28px;height:28px;background:#1e293b;border-radius:50%;"></span>
-            </div>
-            <div class="tool-group">
-                <span>粗细</span>
-                <input type="range" id="penWidth" min="1" max="40" value="4">
-                <span id="widthValue">4px</span>
-            </div>
-            <div class="tool-group">
-                <button id="toolEraser" class="tool-btn">🧽 橡皮</button>
-                <button id="toolPen" class="tool-btn active">✍️ 画笔</button>
-                <button id="toolClearAll" class="tool-btn">🗑️ 清屏</button>
-            </div>
-            <div class="tool-group">
-                <button id="undoBtn" class="tool-btn">↩️ 撤销</button>
-                <button id="saveToGalleryBtn" class="tool-btn">💾 保存到画作列表</button>
-            </div>
-        </div>
-        <canvas id="mainCanvas" width="700" height="900" style="width:100%; height:auto;"></canvas>
-        <div style="font-size:11px; text-align:center; margin-top:10px; color:#6c86a3;">✍️ 绘画后点击「保存到画作列表」可管理多幅作品</div>
+<div class="container">
+  <div class="top-bar">
+    <input type="file" id="fileInput" accept=".json">
+    <button id="btnFormat">✅ 格式化美化</button>
+    <button id="btnCompress">📦 压缩成一行</button>
+    <button id="btnTree">🌳 生成树形预览</button>
+    <button class="fix" id="btnRepair">🔧自动修复</button>
+    <button class="secondary" id="btnCopy">📋 复制文本</button>
+    <button id="btnDownload">💾 导出JSON文件</button>
+    <button id="btnTheme">🌓 深色/浅色</button>
+    <button class="danger" id="btnClear">🗑️ 清空全部</button>
+    <div id="msg"></div>
+  </div>
+  <div class="wrap">
+    <div class="panel">
+      <h3>JSON输入（粘贴json内容 / 选择本地json文件）</h3>
+      <textarea id="input" placeholder="粘贴你的json内容在这里，或者直接选择上面的json文件加载"></textarea>
     </div>
-
-    <!-- 页面2: 画作列表（新增） -->
-    <div class="full-page page-gallery" id="pageGallery">
-        <div class="page-header">
-            <h2>🖼️ 我的画作</h2>
-            <div class="sub-action" id="backToDrawFromGallery">← 返回画板</div>
-        </div>
-        <div class="artwork-list" id="artworkListContainer">
-            <div class="empty-state">✨ 暂无画作，在画板中绘制并保存</div>
-        </div>
+    <div class="panel">
+      <h3>结果 / 树形预览</h3>
+      <div id="tree"></div>
     </div>
-
-    <!-- 页面3: 日记列表 -->
-    <div class="full-page page-list" id="pageList">
-        <div class="page-header">
-            <h2>📖 日记本</h2>
-            <div class="sub-action" id="newDiaryBtn">+ 写新日记</div>
-        </div>
-        <div class="diary-list" id="diaryListContainer"></div>
-    </div>
-
-    <!-- 页面4: 日记查看 + 背景选择 -->
-    <div class="full-page page-view" id="pageView">
-        <div class="page-header">
-            <h2>📄 日记</h2>
-            <div class="sub-action" id="backToListFromView">← 返回列表</div>
-        </div>
-        <div class="bg-selector" id="bgSelector">
-            <div class="bg-option" data-bg="#ffffff" style="background:#ffffff; border:1px solid #ddd;"></div>
-            <div class="bg-option" data-bg="#fef9e3" style="background:#fef9e3;"></div>
-            <div class="bg-option" data-bg="#e6f7ec" style="background:#e6f7ec;"></div>
-            <div class="bg-option" data-bg="#ffe6f0" style="background:#ffe6f0;"></div>
-            <div class="bg-option" data-bg="#e3f2fd" style="background:#e3f2fd;"></div>
-            <div class="bg-option" data-bg="#f5e6d3" style="background:#f5e6d3;"></div>
-            <div class="bg-option" data-bg="#e8eaf6" style="background:#e8eaf6;"></div>
-        </div>
-        <div class="view-container" id="viewContainer">
-            <div class="empty-state">选择一篇日记，直接编辑并更换背景</div>
-        </div>
-        <button id="deleteFromViewBtn" class="delete-view-btn" style="display:none;">🗑️ 删除这篇日记</button>
-    </div>
-</div>
-
-<div class="bottom-nav">
-    <button class="nav-item" data-page="draw"><span class="nav-icon">🎨</span><span>画板</span></button>
-    <button class="nav-item" data-page="gallery"><span class="nav-icon">🖼️</span><span>画作列表</span></button>
-    <button class="nav-item" data-page="list"><span class="nav-icon">📚</span><span>日记列表</span></button>
-    <button class="nav-item" data-page="view"><span class="nav-icon">👁️</span><span>日记查看</span></button>
-</div>
-
-<!-- 新建日记模态框 -->
-<div id="diaryModal" class="modal-mask">
-    <div class="modal-card">
-        <h3>📝 写新日记</h3>
-        <input type="text" id="newDiaryTitle" placeholder="标题" maxlength="60">
-        <textarea id="newDiaryContent" rows="5" placeholder="记录心情..."></textarea>
-        <div style="display:flex; gap:12px; margin-top:12px;">
-            <button id="closeModalBtn" style="background:#eef2f6; flex:1; border:none; border-radius:40px; padding:10px;">取消</button>
-            <button id="confirmNewDiaryBtn" style="background:#1e6fdf; color:white; flex:1; border:none; border-radius:40px; padding:10px;">创建</button>
-        </div>
-    </div>
+  </div>
 </div>
 
 <script>
-    // ======================= 1. 页面导航 =======================
-    const pages = { draw: 'pageDraw', gallery: 'pageGallery', list: 'pageList', view: 'pageView' };
-    function setNavActive(pageId) {
-        document.querySelectorAll('.nav-item').forEach(btn => {
-            if(btn.dataset.page === pageId) btn.classList.add('active');
-            else btn.classList.remove('active');
-        });
-    }
-    function scrollToPage(pageId) {
-        const el = document.getElementById(pages[pageId]);
-        if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        setNavActive(pageId);
-    }
-    document.querySelectorAll('.nav-item').forEach(btn => {
-        btn.addEventListener('click', () => scrollToPage(btn.dataset.page));
-    });
-    // 观察器只负责「高亮当前页签」，不再触发 scrollIntoView，避免与用户手动滚动互相抢
-    const scrollObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if(entry.isIntersecting) {
-                const id = entry.target.id;
-                if(id === 'pageDraw') setNavActive('draw');
-                else if(id === 'pageGallery') setNavActive('gallery');
-                else if(id === 'pageList') setNavActive('list');
-                else if(id === 'pageView') setNavActive('view');
-            }
-        });
-    }, { threshold: 0.4 });
-    scrollObserver.observe(document.getElementById('pageDraw'));
-    scrollObserver.observe(document.getElementById('pageGallery'));
-    scrollObserver.observe(document.getElementById('pageList'));
-    scrollObserver.observe(document.getElementById('pageView'));
+// ========== jsonrepair UMD 完整源码（直接内嵌，零CDN） ==========
+((t,e)=>{"object"==typeof exports&&"undefined"!=typeof module?e(exports):"function"==typeof define&&define.amd?define(["exports"],e):e((t="undefined"!=typeof globalThis?globalThis:t||self).JSONRepair={})})(this,function(t){class y extends Error{constructor(t,e){super("".concat(t," at position ").concat(e)),this.position=e}}let d=125,e=32,O=10,N=9,J=13,S=8,j=12,k=34,r=39,m=48,z=57,l=44,I=65,T=97,Z=70,_=102,s=160,A=8192,E=8202,R=8239,X=8287,Y=12288,n=8220,o=8221,c=8216,i=8217,a=96,f=180;function U(t){return t>=m&&t<=z}function F(t){return h.test(t)}let h=/^[,:[\]/{}()\n+]$/,u=/^[,[\]/{}\n+]$/,tt=/^[a-zA-Z_$]$/,et=/^[a-zA-Z_$0-9]$/,q=/^(http|https|ftp|mailto|file|data|irc):\/\/$/,B=/^[A-Za-z0-9-._~:/?#@!$&'()*+;=]$/;function D(t){return u.test(t)}function G(t){return C.test(t)||t&&K(t.charCodeAt(0))}let C=/^[[{\w-]$/;function H(t){return t===e||t===O||t===N||t===J}function rt(t){return t===e||t===N||t===J}function K(t){return L(t)||P(t)}function L(t){return t===k||t===n||t===o}function M(t){return t===k}function P(t){return t===r||t===c||t===i||t===a||t===f}function Q(t){return t===r}function V(t,e,r){r=2<arguments.length&&void 0!==r&&r,e=t.lastIndexOf(e);return-1!==e?t.substring(0,e)+(r?"":t.substring(e+1)):t}function W(t,e){let r=t.length;if(!H(t.charCodeAt(r-1)))return t+e;for(;H(t.charCodeAt(r-1));)r--;return t.substring(0,r)+e+t.substring(r)}let nt={"\b":"\\b","\f":"\\f","\n":"\\n","\r":"\\r","\t":"\\t"},ot={'"':'"',"\\":"\\","/":"/",b:"\b",f:"\f",n:"\n",r:"\r",t:"\t"};t.JSONRepairError=y,t.jsonrepair=function(C){let g=0,v="";if(!c())throw new y("Unexpected end of json string",C.length);var t=i(l);if(t&&b(),G(C[g])&&/[,\n][ \t\r]*$/.test(v)){t||(v=W(v,","));{let t=!0,e=!0;for(;e;)t?t=!1:i(l)||(v=W(v,",")),e=c();e||(v=V(v,",")),v="[\n".concat(v,"\n]")}}else t&&(v=V(v,","));for(;C.charCodeAt(g)===d||93===C.charCodeAt(g);)g++,b();if(g>=C.length)return v;throw new y("Unexpected character ".concat(JSON.stringify(C[g])),g);function c(){b();var t=(()=>{if(123!==C.charCodeAt(g))return!1;{v+="{",g++,b(),p(l)&&b();let e=!0;for(;g<C.length&&C.charCodeAt(g)!==d;){let t;if(e?(t=!0,e=!1):((t=i(l))||(v=W(v,",")),b()),a(),!(w()||f(!0))){C.charCodeAt(g)===d||123===C.charCodeAt(g)||93===C.charCodeAt(g)||91===C.charCodeAt(g)||void 0===C[g]?v=V(v,","):(()=>{throw new y("Object key expected",g)})();break}b();var r=i(58),n=g>=C.length,o=(r||(G(C[g])||n?v=W(v,":"):u()),c());o||(r||n?v+="null":u())}return C.charCodeAt(g)===d?(v+="}",g++):v=W(v,"}"),!0}})()||(()=>{if(91!==C.charCodeAt(g))return!1;{v+="[",g++,b(),p(l)&&b();let t=!0;for(;g<C.length&&93!==C.charCodeAt(g);){t?t=!1:i(l)||(v=W(v,",")),a();var e=c();if(!e){v=V(v,",");break}}return 93===C.charCodeAt(g)?(v+="]",g++):v=W(v,"]"),!0}})()||w()||(()=>{var t,e,r=g;if(45===C.charCodeAt(g)){if(g++,o())return h(r),!0;if(!U(C.charCodeAt(g)))return g=r,!1}for(;U(C.charCodeAt(g));)g++;if(46===C.charCodeAt(g)){if(g++,o())return h(r),!0;if(!U(C.charCodeAt(g)))return g=r,!1;for(;U(C.charCodeAt(g));)g++}if(101===C.charCodeAt(g)||69===C.charCodeAt(g)){if(g++,45!==C.charCodeAt(g)&&43!==C.charCodeAt(g)||g++,o())return h(r),!0;if(!U(C.charCodeAt(g)))return g=r,!1;for(;U(C.charCodeAt(g));)g++}if(o()){if(g>r)return t=C.slice(r,g),e=/^0\d/.test(t),v+=e?'"'.concat(t,'"'):t,!0}else g=r;return!1})()||e("true","true")||e("false","false")||e("null","null")||e("True","true")||e("False","false")||e("None","null")||f(!1)||(()=>{if("/"===C[g]){var t=g;for(g++;g<C.length&&("/"!==C[g]||"\\"===C[g-1]);)g++;return g++,v+='"'.concat(C.substring(t,g),'"'),!0}})();return b(),t}function b(t){var e=!(0<arguments.length&&void 0!==t)||t;g;let r=n(e);for(;r=(r=(()=>{if(47===C.charCodeAt(g)&&42===C.charCodeAt(g+1)){for(;g<C.length&&!((t,e)=>"*"===t[e]&&"/"===t[e+1])(C,g);)g++;g+=2}else{if(47!==C.charCodeAt(g)||47!==C.charCodeAt(g+1))return!1;for(;g<C.length&&C.charCodeAt(g)!==O;)g++}return!0})())&&n(e););g}function n(t){var e=t?H:rt;let r="";for(;;){var n=C.charCodeAt(g);if(e(n))r+=C[g];else{if(!((n=n)===s||n>=A&&n<=E||n===R||n===X||n===Y))break;r+=" "}g++}return 0<r.length&&(v+=r,!0)}function i(t){return C.charCodeAt(g)===t&&(v+=C[g],g++,!0)}function p(t){return C.charCodeAt(g)===t&&(g++,!0)}function a(){b(),46===C.charCodeAt(g)&&46===C.charCodeAt(g+1)&&46===C.charCodeAt(g+2)&&(g+=3,b(),p(l))}function w(t,e){var r,n,o=0<arguments.length&&void 0!==t&&t,c=1<arguments.length&&void 0!==e?e:-1;let i=92===C.charCodeAt(g);if(i&&(g++,i=!0),K(C.charCodeAt(g))){var a=M(C.charCodeAt(g))?M:Q(C.charCodeAt(g))?Q:P(C.charCodeAt(g))?P:L,f=g,h=v.length;let e='"';for(g++;;){if(g>=C.length)return u=x(g-1),!o&&F(C.charAt(u))?(g=f,v=v.substring(0,h),w(!0)):(e=W(e,'"'),v+=e,!0);if(g===c)return e=W(e,'"'),v+=e,!0;if(a(C.charCodeAt(g))){var u=g,d=e.length;if(e+='"',g++,v+=e,b(!1),o||g>=C.length||F(C.charAt(g))||K(C.charCodeAt(g))||U(C.charCodeAt(g)))return $(),!0;var l=x(u-1),s=C.charAt(l);if(","===s)return g=f,v=v.substring(0,h),w(!1,l);if(F(s))return g=f,v=v.substring(0,h),w(!0);v=v.substring(0,h),g=u+1,e="".concat(e.substring(0,d),"\\").concat(e.substring(d))}else{if(o&&D(C[g])){if(58===C.charCodeAt(g-1)&&q.test(C.substring(f+1,g+2)))for(;g<C.length&&B.test(C[g]);)e+=C[g],g++;return e=W(e,'"'),v+=e,$(),!0}if(92===C.charCodeAt(g)){l=C.charAt(g+1);if(void 0!==ot[l])e+=C.slice(g,g+2),g+=2;else if("u"===l){let t=2;for(;t<6&&((n=C.charCodeAt(g+t))>=m&&n<=z||n>=I&&n<=Z||n>=T&&n<=_);)t++;if(6===t)e+=C.slice(g,g+6),g+=6;else{if(!(g+t>=C.length))throw s=void 0,s=C.slice(g,g+6),new y('Invalid unicode character "'.concat(s,'"'),g);g=C.length}}else e+=l,g+=2}else{var d=C.charAt(g),A=C.charCodeAt(g);if(A===k&&92!==C.charCodeAt(g-1))e+="\\".concat(d);else if((r=A)===O||r===J||r===N||r===S||r===j)e+=nt[d];else{if(!(32<=(r=A)&&r<=1114111))throw A=void 0,A=d,new y("Invalid character ".concat(JSON.stringify(A)),g);e+=d}g++}}i&&p(92)}}return!1}function $(){let t=!1;for(b();43===C.charCodeAt(g);){t=!0,g++,b();var e=(v=V(v,'"',!0)).length,r=w();v=r?(r=v,e=e,n=1,r.substring(0,e)+r.substring(e+n)):W(v,'"')}var n;t}function e(t,e){return C.slice(g,g+t.length)===t&&(v+=e,g+=t.length,!0)}function f(t){var e=g;if(tt.test(C[g])){for(;g<C.length&&et.test(C[g]);)g++;let t=g;for(;H(C.charCodeAt(t));)t++;if("("===C[t])return g=t+1,c(),41===C.charCodeAt(g)&&(g++,59===C.charCodeAt(g))&&g++,!0}for(;g<C.length&&!D(C[g])&&!K(C.charCodeAt(g))&&(!t||58!==C.charCodeAt(g));)g++;if(58===C.charCodeAt(g-1)&&q.test(C.substring(e,g+2)))for(;g<C.length&&B.test(C[g]);)g++;if(g>e){for(;H(C.charCodeAt(g-1))&&0<g;)g--;e=C.slice(e,g);return v+="undefined"===e?"null":JSON.stringify(e),C.charCodeAt(g)===k&&g++,!0}}function x(t){let e=t;for(;0<e&&H(C.charCodeAt(e));)e--;return e}function o(){return g>=C.length||F(C[g])||H(C.charCodeAt(g))}function h(t){v+="".concat(C.slice(t,g),"0")}function u(){throw new y("Colon expected",g)}}});
+// jsonrepair全局对象：JSONRepair.jsonrepair(text)
 
-    // ======================= 2. 画板模块 =======================
-    const canvas = document.getElementById('mainCanvas');
-    const ctx = canvas.getContext('2d');
-    let drawing = false;
-    let currentMode = 'pen';
-    let currentColor = '#1e293b';
-    let currentWidth = 4;
-    let lastX = 0, lastY = 0;
-    let historyStack = [];
-    let historyIndex = -1;
-    const MAX_HISTORY = 30;
+const $ = s => document.querySelector(s);
+const msgBox = $('#msg');
+const fileInput = $('#fileInput');
+const inputTextarea = $('#input');
 
-    function saveToHistory() {
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        if (historyIndex < historyStack.length - 1) historyStack = historyStack.slice(0, historyIndex + 1);
-        historyStack.push(imgData);
-        if (historyStack.length > MAX_HISTORY) historyStack.shift();
-        historyIndex = historyStack.length - 1;
-    }
-    function undo() { if (historyIndex > 0) { historyIndex--; ctx.putImageData(historyStack[historyIndex], 0, 0); } else alert("没有更早的记录"); }
-    function initCanvasBg() { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, canvas.width, canvas.height); saveToHistory(); }
-    function setDrawStyle() {
-        ctx.strokeStyle = currentMode === 'eraser' ? '#FFFFFF' : currentColor;
-        ctx.lineWidth = currentWidth;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.globalCompositeOperation = 'source-over';
-    }
-    function getCanvasCoords(e) {
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
-        let clientX, clientY;
-        if (e.touches) { if (!e.touches.length) return null; clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
-        else { clientX = e.clientX; clientY = e.clientY; }
-        let offsetX = clientX - rect.left, offsetY = clientY - rect.top;
-        offsetX = Math.min(Math.max(0, offsetX), rect.width);
-        offsetY = Math.min(Math.max(0, offsetY), rect.height);
-        return { x: offsetX * scaleX, y: offsetY * scaleY };
-    }
-    function startDraw(e) {
-        e.preventDefault(); drawing = true; setDrawStyle();
-        const c = getCanvasCoords(e); if(c) { lastX=c.x; lastY=c.y; ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(lastX+0.5,lastY+0.5); ctx.stroke(); ctx.beginPath(); ctx.moveTo(lastX,lastY); }
-    }
-    function drawMove(e) { if(!drawing) return; e.preventDefault(); setDrawStyle(); const c = getCanvasCoords(e); if(!c) return; ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(c.x,c.y); ctx.stroke(); lastX=c.x; lastY=c.y; }
-    function endDraw(e) { if(!drawing) return; e.preventDefault(); drawing=false; ctx.beginPath(); saveToHistory(); }
-    canvas.addEventListener('mousedown', startDraw); canvas.addEventListener('mousemove', drawMove); canvas.addEventListener('mouseup', endDraw); canvas.addEventListener('mouseleave', endDraw);
-    canvas.addEventListener('touchstart', startDraw, {passive:false}); canvas.addEventListener('touchmove', drawMove, {passive:false}); canvas.addEventListener('touchend', endDraw); canvas.addEventListener('touchcancel', endDraw);
-    document.getElementById('penColor').addEventListener('input', (e) => { currentColor = e.target.value; document.getElementById('colorPreview').style.backgroundColor = currentColor; if(currentMode !== 'eraser') setDrawStyle(); });
-    document.getElementById('penWidth').addEventListener('input', (e) => { currentWidth = parseInt(e.target.value); document.getElementById('widthValue').innerText = currentWidth+'px'; setDrawStyle(); });
-    document.getElementById('toolPen').addEventListener('click', () => { currentMode='pen'; setDrawStyle(); document.getElementById('toolPen').classList.add('active'); document.getElementById('toolEraser').classList.remove('active'); });
-    document.getElementById('toolEraser').addEventListener('click', () => { currentMode='eraser'; setDrawStyle(); document.getElementById('toolEraser').classList.add('active'); document.getElementById('toolPen').classList.remove('active'); });
-    document.getElementById('clearDrawBtn').addEventListener('click', () => { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillStyle='#FFFFFF'; ctx.fillRect(0,0,canvas.width,canvas.height); saveToHistory(); });
-    document.getElementById('toolClearAll').addEventListener('click', () => { if(confirm('清空所有绘画？')) { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillStyle='#FFFFFF'; ctx.fillRect(0,0,canvas.width,canvas.height); saveToHistory(); } });
-    document.getElementById('undoBtn').addEventListener('click', () => undo());
-    initCanvasBg();
+let treeDebounceTimer = null;
+const DEBOUNCE_DELAY = 300;
+inputTextarea.addEventListener('input', function () {
+  clearTimeout(treeDebounceTimer);
+  treeDebounceTimer = setTimeout(parseTree, DEBOUNCE_DELAY);
+});
+window.addEventListener('beforeunload', ()=> clearTimeout(treeDebounceTimer));
 
-    // ======================= 3. 画作列表管理 =======================
-    let artworks = []; // { id, name, imageData, createdAt }
-    function loadArtworks() {
-        const stored = localStorage.getItem('artwork_gallery_list');
-        if(stored) { try { artworks = JSON.parse(stored); } catch(e){} }
-        if(!artworks) artworks = [];
-        renderArtworkList();
-    }
-    function saveArtworks() {
-        try {
-            localStorage.setItem('artwork_gallery_list', JSON.stringify(artworks));
-        } catch(e) {
-            alert('画作保存失败：本地存储空间不足，请删除部分画作后再试。');
-        }
-        renderArtworkList();
-    }
-    
-    function renderArtworkList() {
-        const container = document.getElementById('artworkListContainer');
-        if(!artworks.length) { container.innerHTML = '<div class="empty-state">🖼️ 暂无画作，在画板中绘制并点击「保存到画作列表」</div>'; return; }
-        container.innerHTML = '';
-        [...artworks].reverse().forEach(art => {
-            const card = document.createElement('div'); card.className = 'artwork-card';
-            card.innerHTML = `
-                <div class="artwork-title">
-                    <span>🎨 ${escapeHtml(art.name)}</span>
-                    <div>
-                        <button class="rename-artwork" data-id="${art.id}" style="background:none; border:none; font-size:1rem; cursor:pointer;">✏️</button>
-                        <button class="delete-artwork" data-id="${art.id}" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">🗑️</button>
-                    </div>
-                </div>
-                <div class="artwork-preview"><img src="${art.imageData}" alt="preview"></div>
-                <div class="artwork-meta"><span>📅 ${art.createdAt}</span><span style="color:#3b82f6;">点击查看大图</span></div>
-            `;
-            card.addEventListener('click', (e) => {
-                if(e.target.classList.contains('rename-artwork') || e.target.classList.contains('delete-artwork')) return;
-                // 预览大图
-                const win = window.open();
-                win.document.write(`<img src="${art.imageData}" style="max-width:100%; margin:0 auto; display:block; background:#fff;" alt="画作">`);
-            });
-            card.querySelector('.rename-artwork').addEventListener('click', (e) => {
-                e.stopPropagation();
-                const newName = prompt('输入画作名称', art.name);
-                if(newName && newName.trim()) { art.name = newName.trim(); saveArtworks(); }
-            });
-            card.querySelector('.delete-artwork').addEventListener('click', (e) => {
-                e.stopPropagation();
-                if(confirm('删除这幅画作？')) { artworks = artworks.filter(a => a.id !== art.id); saveArtworks(); }
-            });
-            container.appendChild(card);
-        });
-    }
-    
-    // 保存当前画板到画作列表
-    document.getElementById('saveToGalleryBtn').addEventListener('click', () => {
-        const imageData = canvas.toDataURL('image/png');
-        const name = prompt('给这幅画起个名字', `画作 ${artworks.length+1}`);
-        if(name === null) return;
-        const newArt = {
-            id: Date.now(),
-            name: name.trim() || `画作 ${artworks.length+1}`,
-            imageData: imageData,
-            createdAt: new Date().toLocaleString()
-        };
-        artworks.unshift(newArt);
-        saveArtworks();
-        alert('已保存到画作列表！');
-    });
-    document.getElementById('backToDrawFromGallery').addEventListener('click', () => scrollToPage('draw'));
-    
-    // ======================= 4. 日记系统 =======================
-    let diaries = [];
-    let currentViewId = null;
+function showMsg(text, isErr=false){
+  msgBox.className = isErr ? 'error' : 'success';
+  msgBox.innerText = text;
+}
 
-    function loadDiaries() {
-        const stored = localStorage.getItem('full_diary_with_bg_final');
-        if(stored) { try { diaries = JSON.parse(stored); } catch(e){} }
-        if(!diaries || diaries.length === 0) {
-            diaries = [{
-                id: Date.now(),
-                title: '🌟 第一篇日记',
-                content: '欢迎使用全能日记本！\n\n• 左侧画板可以自由绘画\n• 画作可以保存到「画作列表」管理\n• 日记支持直接编辑，自动保存\n• 点击下方背景色块可以更换日记背景',
-                createdAt: new Date().toLocaleString(),
-                updatedAt: new Date().toLocaleString(),
-                bgColor: '#ffffff'
-            }];
-            saveDiaries();
-        }
-        renderDiaryList();
-        if(currentViewId) refreshViewContent();
+function repairJson(){
+  const txt = $('#input').value.trim();
+  if(!txt){ showMsg("❌输入内容为空",true); return; }
+  try{
+    JSON.parse(txt);
+    showMsg("✅JSON无需修复");
+    return;
+  }catch(err){}
+
+  if(typeof JSONRepair?.jsonrepair !== "function"){
+    showMsg("❌jsonrepair库未加载",true);
+    return;
+  }
+
+  try{
+      // 调用库修复
+      const rawFixed = JSONRepair.jsonrepair(txt);
+      // 修复完成之后自动格式化美化
+      const obj = JSON.parse(rawFixed);
+      const pretty = JSON.stringify(obj,null,2);
+      $('#input').value = pretty;
+      parseTree();
+      showMsg("✅自动修复并美化完成！请人工核对修复结果！");
+  }catch(e2){
+    showMsg("❌修复失败："+e2.message,true);
+  }
+}
+
+function formatJson(){
+  const txt = $('#input').value.trim();
+  try{
+    const obj = JSON.parse(txt);
+    $('#input').value = JSON.stringify(obj,null,2);
+    parseTree();
+    showMsg("✅ JSON校验通过，已美化");
+  }catch(e){ showMsg("❌ JSON语法错误："+e.message,true); }
+}
+
+function compressJson(){
+  const txt = $('#input').value.trim();
+  try{
+    const obj = JSON.parse(txt);
+    $('#input').value = JSON.stringify(obj);
+    parseTree();
+    showMsg("✅ 压缩完成");
+  }catch(e){ showMsg("❌ JSON语法错误："+e.message,true); }
+}
+
+function parseTree(){
+  const txt = $('#input').value.trim();
+  const treeDom = $('#tree');
+  try{
+    if(!txt){ treeDom.innerText = ""; msgBox.innerText = ""; return; }
+    const obj = JSON.parse(txt);
+    treeDom.innerHTML = renderTree(obj);
+    showMsg("✅ 树形解析成功");
+  }catch(e){
+    treeDom.innerText = "JSON解析失败：" + e.message;
+    showMsg("❌ JSON语法错误："+e.message,true);
+  }
+}
+
+function renderTree(data){
+  if(Array.isArray(data)){
+    let html = '[<div style="padding-left:18px">';
+    data.forEach((item,i)=> html += `<div>[${i}]: ${renderTree(item)}</div>`);
+    html += '</div>]';
+    return html;
+  }else if(typeof data === 'object' && data!==null){
+    let html = '{<div style="padding-left:18px">';
+    for(let k in data){
+      const v = data[k];
+      html += `<div><span class="tree-key">"${k}"</span>: ${renderTree(v)}</div>`;
     }
-    function saveDiaries() {
-        try {
-            localStorage.setItem('full_diary_with_bg_final', JSON.stringify(diaries));
-        } catch(e) {
-            alert('日记保存失败：本地存储空间不足，请删除部分内容后再试。');
-        }
-        renderDiaryList();
-        if(currentViewId) refreshViewContent();
-    }
-    function renderDiaryList() {
-        const container = document.getElementById('diaryListContainer');
-        if(!diaries.length) { container.innerHTML = '<div class="empty-state">📭 暂无日记，点击「写新日记」</div>'; return; }
-        container.innerHTML = '';
-        [...diaries].reverse().forEach(diary => {
-            const card = document.createElement('div'); card.className = 'diary-card';
-            card.innerHTML = `<div class="diary-title"><span>📔 ${escapeHtml(diary.title)}</span><button class="delete-diary-list" data-id="${diary.id}" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">🗑️</button></div>
-            <div class="diary-preview">${escapeHtml(diary.content.substring(0,80))}${diary.content.length>80?'…':''}</div>
-            <div class="diary-meta"><span>🕒 ${diary.updatedAt || diary.createdAt}</span><span style="color:#3b82f6;">查看/编辑</span></div>`;
-            card.addEventListener('click', (e) => { if(!e.target.classList.contains('delete-diary-list')) { viewDiaryDetail(diary.id); scrollToPage('view'); } });
-            card.querySelector('.delete-diary-list').addEventListener('click', (e) => { e.stopPropagation(); if(confirm('永久删除？')) { diaries = diaries.filter(d => d.id !== diary.id); if(currentViewId === diary.id) currentViewId = null; saveDiaries(); if(!diaries.length) document.getElementById('viewContainer').innerHTML = '<div class="empty-state">日记已删除</div>'; refreshViewContent(); } });
-            container.appendChild(card);
-        });
-    }
-    function viewDiaryDetail(id) {
-        const diary = diaries.find(d => d.id === id);
-        if(!diary) return;
-        currentViewId = id;
-        document.getElementById('pageView').style.backgroundColor = diary.bgColor || '#ffffff';
-        document.querySelectorAll('.bg-option').forEach(opt => { if(opt.dataset.bg === (diary.bgColor||'#ffffff')) opt.classList.add('active'); else opt.classList.remove('active'); });
-        refreshViewContent();
-    }
-    function refreshViewContent() {
-        const container = document.getElementById('viewContainer');
-        if(!currentViewId) { container.innerHTML = '<div class="empty-state">选择一篇日记，直接编辑并更换背景</div>'; document.getElementById('deleteFromViewBtn').style.display = 'none'; return; }
-        const diary = diaries.find(d => d.id === currentViewId);
-        if(!diary) return;
-        container.innerHTML = `<input type="text" id="editableTitle" class="view-title-input" value="${escapeHtml(diary.title)}" placeholder="标题">
-            <div class="view-time">📅 最后更新：${diary.updatedAt || diary.createdAt}</div>
-            <textarea id="editableContent" class="view-content-textarea" placeholder="写点什么...">${escapeHtml(diary.content)}</textarea>
-            <div class="inline-save-tip" id="autoSaveHint">✨ 内容自动保存</div>`;
-        document.getElementById('deleteFromViewBtn').style.display = 'block';
-        const titleInput = document.getElementById('editableTitle'), contentArea = document.getElementById('editableContent');
-        let timer = null;
-        function autoSave() { if(timer) clearTimeout(timer); timer = setTimeout(() => { const idx = diaries.findIndex(d => d.id === currentViewId); if(idx !== -1) { diaries[idx].title = titleInput.value.trim() || '无标题'; diaries[idx].content = contentArea.value; diaries[idx].updatedAt = new Date().toLocaleString(); saveDiaries(); const hint = document.getElementById('autoSaveHint'); if(hint) { hint.innerText = '✅ 已自动保存'; setTimeout(() => { if(hint) hint.innerText = '✨ 内容自动保存'; }, 1500); } } }, 600); }
-        titleInput.addEventListener('input', autoSave); contentArea.addEventListener('input', autoSave);
-    }
-    function escapeHtml(str) {
-        if(!str) return '';
-        return str.replace(/[&<>"']/g, m => ({
-            '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
-        }[m]));
-    }
-    document.querySelectorAll('.bg-option').forEach(opt => { opt.addEventListener('click', () => { if(!currentViewId) { alert('请先选择一篇日记'); return; } const newBg = opt.dataset.bg; const idx = diaries.findIndex(d => d.id === currentViewId); if(idx !== -1) { diaries[idx].bgColor = newBg; saveDiaries(); } document.getElementById('pageView').style.backgroundColor = newBg; document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('active')); opt.classList.add('active'); }); });
-    document.getElementById('deleteFromViewBtn').addEventListener('click', () => { if(!currentViewId) return; if(confirm('彻底删除这篇日记？')) { diaries = diaries.filter(d => d.id !== currentViewId); currentViewId = null; saveDiaries(); document.getElementById('viewContainer').innerHTML = '<div class="empty-state">日记已删除</div>'; document.getElementById('deleteFromViewBtn').style.display = 'none'; document.getElementById('pageView').style.backgroundColor = '#fffdf7'; } });
-    document.getElementById('backToListFromView').addEventListener('click', () => scrollToPage('list'));
-    const modal = document.getElementById('diaryModal');
-    document.getElementById('newDiaryBtn').addEventListener('click', () => modal.style.display = 'flex');
-    document.getElementById('closeModalBtn').addEventListener('click', () => modal.style.display = 'none');
-    document.getElementById('confirmNewDiaryBtn').addEventListener('click', () => { const title = document.getElementById('newDiaryTitle').value.trim(); const content = document.getElementById('newDiaryContent').value; if(!title && !content) { alert('请填写标题或内容'); return; } const newDiary = { id: Date.now(), title: title || '无标题', content: content, createdAt: new Date().toLocaleString(), updatedAt: new Date().toLocaleString(), bgColor: '#ffffff' }; diaries.unshift(newDiary); saveDiaries(); modal.style.display = 'none'; document.getElementById('newDiaryTitle').value = ''; document.getElementById('newDiaryContent').value = ''; scrollToPage('list'); });
-    modal.addEventListener('click', (e) => { if(e.target === modal) modal.style.display = 'none'; });
-    
-    loadArtworks();
-    loadDiaries();
+    html += '</div>}';
+    return html;
+  }else if(typeof data === 'string'){
+    return `<span class="tree-string">"${escapeHtml(data)}"</span>`;
+  }else if(typeof data === 'number'){
+    return `<span class="tree-num">${data}</span>`;
+  }else if(typeof data === 'boolean'){
+    return `<span class="tree-bool">${data}</span>`;
+  }else if(data===null){
+    return `<span class="tree-null">null</span>`;
+  }
+  return "";
+}
+function escapeHtml(str){
+  return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+}
+
+function copyResult(){
+  navigator.clipboard.writeText($('#input').value).then(()=>{
+    showMsg("✅ 复制成功");
+  }).catch(e=> showMsg("❌ 复制失败："+e.message,true));
+}
+
+function downloadJson(){
+  const text = $('#input').value.trim();
+  if(!text){ showMsg("❌ 内容为空，无法导出",true); return; }
+  try{
+    JSON.parse(text);
+    const blob = new Blob([text], {type: 'application/json;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "json.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showMsg("✅ 文件已下载");
+  }catch(e){ showMsg("❌ JSON语法错误，不能导出："+e.message,true); }
+}
+
+function toggleDark(){ document.body.classList.toggle('dark'); }
+
+function clearAll(){
+  $('#input').value = '';
+  $('#tree').innerText = '';
+  msgBox.innerText='';
+  fileInput.value = '';
+}
+
+fileInput.onchange = function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    $('#input').value = evt.target.result;
+    parseTree();
+    showMsg(`✅ 已加载文件：${file.name}`);
+  }
+  reader.readAsText(file);
+}
+
+$('#btnFormat').addEventListener('click',formatJson);
+$('#btnCompress').addEventListener('click',compressJson);
+$('#btnTree').addEventListener('click',parseTree);
+$('#btnRepair').addEventListener('click',repairJson);
+$('#btnCopy').addEventListener('click',copyResult);
+$('#btnDownload').addEventListener('click',downloadJson);
+$('#btnTheme').addEventListener('click',toggleDark);
+$('#btnClear').addEventListener('click',clearAll);
+
+if(typeof JSONRepair?.jsonrepair === "function"){
+  showMsg("✅ jsonrepair已就绪，离线完整版");
+}else{
+  showMsg("❌ jsonrepair加载异常",true);
+}
 </script>
 </body>
 </html>
