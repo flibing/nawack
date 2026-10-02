@@ -1061,13 +1061,26 @@ inputTextarea.addEventListener('scroll', function () {
 // 1) 粘贴 → 自动修复 + 美化
 inputTextarea.addEventListener('paste', function () {
   if (!cfg.auto) return;
-  setTimeout(function () { autoBeautify('已美化粘贴内容'); }, 0);
+  setTimeout(function () {
+    autoBeautify('已美化粘贴内容');
+    // 原生粘贴会把滚动条滚到粘贴内容末尾，这里等浏览器渲染完再强制归零
+    setTimeout(function () {
+      inputTextarea.scrollTop = 0;
+      inputTextarea.scrollLeft = 0;
+    }, 50);
+  }, 0);
 });
 
 // 2) 拖入文本 → 自动修复 + 美化
 inputTextarea.addEventListener('drop', function () {
   if (!cfg.auto) return;
-  setTimeout(function () { autoBeautify('已美化拖入内容'); }, 0);
+  setTimeout(function () {
+    autoBeautify('已美化拖入内容');
+    setTimeout(function () {
+      inputTextarea.scrollTop = 0;
+      inputTextarea.scrollLeft = 0;
+    }, 50);
+  }, 0);
 });
 
 // 3) 普通输入：rAF 刷新高亮（不等防抖，打字时即时上色）；防抖刷新预览；兜底处理不触发 paste 事件的粘贴方式
