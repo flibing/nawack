@@ -2,7 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>本地JSON工具 - TVBox｜完整jsonrepair单离线文件</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>本地JSON工具 - TVBox｜粘贴自动美化 · 离线单文件</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,sans-serif}
 :root{
@@ -17,6 +18,8 @@
   --tree-num:#2563eb;
   --tree-bool:#7c3aed;
   --tree-null:#888;
+  --guide:rgba(110,125,150,.34);
+  --wrap:rgba(110,125,150,.5);
 }
 .dark{
   --bg:#1e1e1e;
@@ -30,49 +33,160 @@
   --tree-num:#4ec9b0;
   --tree-bool:#c586c0;
   --tree-null:#8a8a8a;
+  --guide:rgba(170,185,210,.26);
+  --wrap:rgba(170,185,210,.42);
 }
-body{padding:16px;background:var(--bg);color:var(--text);transition:0.2s}
-.container{max-width:1400px;margin:0 auto}
-.top-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
-button{padding:8px 14px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-size:14px}
+body{padding:6px;background:var(--bg);color:var(--text);transition:0.2s;height:100vh;display:flex;flex-direction:column}
+.container{max-width:1560px;width:100%;margin:0 auto;flex:1;min-height:0;display:flex;flex-direction:column}
+.top-bar{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center}
+/* 第二排：选择文件 + 自动系列开关 + 自动修复/清空 */
+.bar-sep{width:1px;height:22px;background:var(--panel-border);margin:0 2px}
+/* 推到本排最右侧（第一排的深色/浅色图标按钮） */
+.pushed{margin-left:auto}
+button{padding:8px 14px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-size:14px;transition:filter .15s}
+button:hover{filter:brightness(1.08)}
 button.secondary{background:#666}
 button.danger{background:#dc2626}
-button.fix{background:#059669;}
-.wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;height:calc(100vh - 140px)}
-.panel{display:flex;flex-direction:column;background:var(--panel-bg);border-radius:8px;overflow:hidden;border:1px solid var(--panel-border)}
-.panel h3{padding:10px;background:var(--panel-header);margin:0;font-size:15px;color:var(--text)}
-textarea{flex:1;width:100%;padding:12px;border:none;outline:none;font-family:Consolas,monospace;font-size:13px;resize:none;background:var(--input-bg);color:var(--text)}
-#tree{flex:1;padding:12px;overflow:auto;font-family:Consolas;font-size:13px;background:var(--panel-bg);color:var(--text)}
-.error{color:#ff4d4f;font-weight:bold;margin:8px 0}
-.success{color:#36d399;font-weight:bold;margin:8px 0}
+button.fix{background:#059669}
+button.auto{background:#0ea5e9}
+button.auto.off{background:#9ca3af}
+button.wrapbtn{background:#7c3aed}
+button.wrapbtn.off{background:#9ca3af}
+button.guidebtn{background:#0891b2}
+button.guidebtn.off{background:#9ca3af}
+button.mini{padding:2px 9px;font-size:12px;background:#64748b;border-radius:4px}
+/* 图标按钮（深色/浅色）：只显示月亮/太阳，不显示文字 */
+button.iconbtn{display:inline-flex;align-items:center;justify-content:center;padding:8px 10px;line-height:0}
+.iconbtn .ico{display:block}
+.iconbtn .ico-sun{display:none}
+.dark .iconbtn .ico-sun{display:block}
+.dark .iconbtn .ico-moon{display:none}
+select.indent{padding:8px 6px;border-radius:6px;border:1px solid var(--panel-border);background:var(--panel-bg);color:var(--text);font-size:13px;cursor:pointer}
+input[type=file]{font-size:13px;color:var(--text);max-width:170px}
+.status-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;min-height:22px;margin-bottom:8px}
+.status-bar .stats{color:#8a8f98;font-size:12px;font-family:Consolas,monospace;white-space:nowrap}
+.wrap{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;min-height:0}
+.panel{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--panel-bg);border-radius:8px;overflow:hidden;border:1px solid var(--panel-border)}
+.panel h3{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--panel-header);margin:0;font-size:14px;color:var(--text);font-weight:600}
+.panel h3 .h3-tools{display:flex;gap:6px;flex:0 0 auto}
+/* 编辑器容器：输入框文字透明，底下垫语法高亮层，再垫缩进竖线引导层 */
+.editor{position:relative;flex:1;min-width:0;min-height:0;display:flex;background:var(--input-bg)}
+#guides{position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:0}
+/* 语法高亮底层：与 textarea 同字体 / 同内边距 / 同换行规则，滚动由 JS 严格同步。
+   颜色全部复用右树变量（键棕、字符串绿、数字蓝、布尔紫、标点灰），
+   所以左栏文本和右栏树形看起来是一套配色。 */
+#hl{position:absolute;left:0;top:0;overflow:hidden;pointer-events:none;z-index:0;background:transparent}
+#hl pre{margin:0;padding:12px;border:0;font-family:Consolas,monospace;font-size:13px;line-height:1.6;tab-size:2;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text)}
+body.nowrap #hl pre{white-space:pre;overflow-wrap:normal;word-break:normal}
+/* Chromium：pre 内裸 span 不显式声明 font-family 时，其行盒 strut 度量会与
+   直接文本节点不同（每行约高 1px，长文档累积上百 px 漂移）。必须显式继承。 */
+#hl pre span{font-family:inherit}
+.tok-key{color:var(--tree-key)}
+.tok-string{color:var(--tree-string)}
+.tok-num{color:var(--tree-num)}
+.tok-bool{color:var(--tree-bool)}
+.tok-null{color:var(--tree-null)}
+.tok-punc{color:var(--tree-null)}
+/* 超长文本（>100万字符）跳过高亮，退回单色文字，避免打字卡顿 */
+body.hl-off #hl{display:none}
+body.hl-off textarea{color:var(--text)}
+.guide-v{position:absolute;width:0;border-left:1px dashed var(--guide)}
+/* 折行标记：软换行续行左侧的浅色「↳」，说明这行是上一行的续行（不占任何排版宽度） */
+.wrap-mark{position:absolute;background:var(--wrap);border-radius:1px}
+body.noguide .guide-v{display:none}
+/* 默认自动换行：长 URL 折行显示，不会出现横向滚动条 */
+textarea{position:relative;z-index:1;flex:1;width:100%;min-width:0;padding:12px;border:none;outline:none;font-family:Consolas,monospace;font-size:13px;line-height:1.6;resize:none;background:transparent;color:transparent;caret-color:var(--text);tab-size:2;white-space:pre-wrap;overflow-wrap:anywhere;overflow-x:hidden;overflow-y:auto}
+textarea::placeholder{color:#9ca3af}
+.dark textarea::placeholder{color:#6b7280}
+/* 选区半透明：文字本身透明，颜色来自底层 pre，选区盖上去后彩色文字仍清晰可辨 */
+textarea::selection{color:transparent;background:rgba(37,99,235,.20)}
+.dark textarea::selection{background:rgba(96,165,250,.28)}
+#tree{flex:1;min-width:0;padding:10px 12px;overflow:auto;font-family:Consolas,monospace;font-size:13px;line-height:1.7;background:var(--panel-bg);color:var(--text)}
+/* 关闭自动换行时：严格按原样单行显示，横向滚动条从最左开始 */
+body.nowrap textarea{white-space:pre;overflow-wrap:normal;word-break:normal;overflow-x:auto}
+body.nowrap .tn-head,body.nowrap .tn-leaf{white-space:pre;overflow-wrap:normal}
+.error{color:#e11d48;font-weight:bold;margin:8px 0}
+.success{color:#0d9488;font-weight:bold;margin:8px 0}
+.dark .error{color:#ff7875}
+.dark .success{color:#36d399}
 .tree-key{color:var(--tree-key)}
 .tree-string{color:var(--tree-string)}
+/* 树形中的 URL 值：可点击、带下划线、悬停变色 */
+#tree a.tree-link{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;word-break:break-all}
+#tree a.tree-link:hover{color:var(--tree-num);text-decoration-style:solid}
 .tree-num{color:var(--tree-num)}
 .tree-bool{color:var(--tree-bool)}
 .tree-null{color:var(--tree-null)}
+.tree-idx{color:var(--tree-num);opacity:.8}
+.tree-brace{color:var(--tree-null)}
+.tree-count{color:var(--tree-null);font-size:11px;background:rgba(128,128,128,.18);border-radius:9px;padding:0 7px;margin:0 4px;vertical-align:1px}
+.tn-head{white-space:pre-wrap}
+.tog{display:inline-block;width:14px;cursor:pointer;color:#8a8f98;user-select:none;transition:transform .15s}
+.tn.collapsed>.tn-head>.tog{transform:rotate(-90deg)}
+.tn>.tn-head .dots,.tn>.tn-head .c-close{display:none}
+.tn.collapsed>.tn-body,.tn.collapsed>.tn-foot{display:none}
+.tn.collapsed>.tn-head .dots,.tn.collapsed>.tn-head .c-close{display:inline}
+.tn-body{padding-left:18px}
+.tn-leaf{white-space:pre-wrap;overflow-wrap:anywhere}
+.tree-error{color:#e11d48}
+@media(max-width:900px){
+  body{height:auto;display:block}
+  .container{display:block}
+  .wrap{grid-template-columns:1fr;flex:none;height:auto}
+  textarea,#tree{min-height:300px;height:42vh}
+}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="top-bar">
-    <input type="file" id="fileInput" accept=".json">
+    <select class="indent" id="indentSel" title="美化时的缩进方式">
+      <option value="2">缩进 2 空格</option>
+      <option value="4">缩进 4 空格</option>
+      <option value="tab">缩进 Tab</option>
+    </select>
     <button id="btnFormat">✅ 格式化美化</button>
     <button id="btnCompress">📦 压缩成一行</button>
     <button id="btnTree">🌳 生成树形预览</button>
-    <button class="fix" id="btnRepair">🔧自动修复</button>
     <button class="secondary" id="btnCopy">📋 复制文本</button>
     <button id="btnDownload">💾 导出JSON文件</button>
-    <button id="btnTheme">🌓 深色/浅色</button>
+    <button class="iconbtn pushed" id="btnTheme" title="切换深色 / 浅色主题" aria-label="切换深色 / 浅色主题">
+      <svg class="ico ico-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="ico ico-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.2v2.4M12 19.4v2.4M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2.2 12h2.4M19.4 12h2.4M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/></svg>
+    </button>
+  </div>
+  <div class="top-bar">
+    <input type="file" id="fileInput" accept=".json,.txt,.js" title="选择本地 .json 文件">
+    <button class="auto" id="btnAuto">⚡ 自动美化：开</button>
+    <button class="wrapbtn" id="btnWrap">↔ 自动换行：开</button>
+    <button class="guidebtn" id="btnGuide">│ 缩进竖线：开</button>
+    <span class="bar-sep"></span>
+    <button class="fix" id="btnRepair">🔧 自动修复</button>
     <button class="danger" id="btnClear">🗑️ 清空全部</button>
-    <div id="msg"></div>
+  </div>
+  <div class="status-bar">
+    <span id="msg"></span>
+    <span class="stats" id="stats"></span>
   </div>
   <div class="wrap">
     <div class="panel">
-      <h3>JSON输入（粘贴json内容 / 选择本地json文件）</h3>
-      <textarea id="input" placeholder="粘贴你的json内容在这里，或者直接选择上面的json文件加载"></textarea>
+      <h3>
+        <span>JSON输入（粘贴 / 拖入 / 打开文件 → 自动美化）</span>
+      </h3>
+      <div class="editor">
+        <div id="guides" aria-hidden="true"></div>
+        <div id="hl" aria-hidden="true"><pre id="hl-code"></pre></div>
+        <textarea id="input" spellcheck="false" placeholder="直接把 json 内容粘贴进来：自动美化成多行缩进格式（只排版、不改动内容）。&#10;也可以拖入文件，或点击上方工具栏的「选择文件」（第二排第一个）加载 .json。&#10;内容本身有语法错误时不会自动修复，请手动点「🔧 自动修复」。&#10;&#10;快捷键：Ctrl+Shift+F 美化 ｜ Ctrl+S 导出"></textarea>
+      </div>
     </div>
     <div class="panel">
-      <h3>结果 / 树形预览</h3>
+      <h3>
+        <span>结果 / 树形预览</span>
+        <span class="h3-tools">
+          <button class="mini" id="btnExpand">展开全部</button>
+          <button class="mini" id="btnCollapse">折叠全部</button>
+        </span>
+      </h3>
       <div id="tree"></div>
     </div>
   </div>
@@ -81,176 +195,988 @@ textarea{flex:1;width:100%;padding:12px;border:none;outline:none;font-family:Con
 <script>
 // ========== jsonrepair UMD 完整源码（直接内嵌，零CDN） ==========
 ((t,e)=>{"object"==typeof exports&&"undefined"!=typeof module?e(exports):"function"==typeof define&&define.amd?define(["exports"],e):e((t="undefined"!=typeof globalThis?globalThis:t||self).JSONRepair={})})(this,function(t){class y extends Error{constructor(t,e){super("".concat(t," at position ").concat(e)),this.position=e}}let d=125,e=32,O=10,N=9,J=13,S=8,j=12,k=34,r=39,m=48,z=57,l=44,I=65,T=97,Z=70,_=102,s=160,A=8192,E=8202,R=8239,X=8287,Y=12288,n=8220,o=8221,c=8216,i=8217,a=96,f=180;function U(t){return t>=m&&t<=z}function F(t){return h.test(t)}let h=/^[,:[\]/{}()\n+]$/,u=/^[,[\]/{}\n+]$/,tt=/^[a-zA-Z_$]$/,et=/^[a-zA-Z_$0-9]$/,q=/^(http|https|ftp|mailto|file|data|irc):\/\/$/,B=/^[A-Za-z0-9-._~:/?#@!$&'()*+;=]$/;function D(t){return u.test(t)}function G(t){return C.test(t)||t&&K(t.charCodeAt(0))}let C=/^[[{\w-]$/;function H(t){return t===e||t===O||t===N||t===J}function rt(t){return t===e||t===N||t===J}function K(t){return L(t)||P(t)}function L(t){return t===k||t===n||t===o}function M(t){return t===k}function P(t){return t===r||t===c||t===i||t===a||t===f}function Q(t){return t===r}function V(t,e,r){r=2<arguments.length&&void 0!==r&&r,e=t.lastIndexOf(e);return-1!==e?t.substring(0,e)+(r?"":t.substring(e+1)):t}function W(t,e){let r=t.length;if(!H(t.charCodeAt(r-1)))return t+e;for(;H(t.charCodeAt(r-1));)r--;return t.substring(0,r)+e+t.substring(r)}let nt={"\b":"\\b","\f":"\\f","\n":"\\n","\r":"\\r","\t":"\\t"},ot={'"':'"',"\\":"\\","/":"/",b:"\b",f:"\f",n:"\n",r:"\r",t:"\t"};t.JSONRepairError=y,t.jsonrepair=function(C){let g=0,v="";if(!c())throw new y("Unexpected end of json string",C.length);var t=i(l);if(t&&b(),G(C[g])&&/[,\n][ \t\r]*$/.test(v)){t||(v=W(v,","));{let t=!0,e=!0;for(;e;)t?t=!1:i(l)||(v=W(v,",")),e=c();e||(v=V(v,",")),v="[\n".concat(v,"\n]")}}else t&&(v=V(v,","));for(;C.charCodeAt(g)===d||93===C.charCodeAt(g);)g++,b();if(g>=C.length)return v;throw new y("Unexpected character ".concat(JSON.stringify(C[g])),g);function c(){b();var t=(()=>{if(123!==C.charCodeAt(g))return!1;{v+="{",g++,b(),p(l)&&b();let e=!0;for(;g<C.length&&C.charCodeAt(g)!==d;){let t;if(e?(t=!0,e=!1):((t=i(l))||(v=W(v,",")),b()),a(),!(w()||f(!0))){C.charCodeAt(g)===d||123===C.charCodeAt(g)||93===C.charCodeAt(g)||91===C.charCodeAt(g)||void 0===C[g]?v=V(v,","):(()=>{throw new y("Object key expected",g)})();break}b();var r=i(58),n=g>=C.length,o=(r||(G(C[g])||n?v=W(v,":"):u()),c());o||(r||n?v+="null":u())}return C.charCodeAt(g)===d?(v+="}",g++):v=W(v,"}"),!0}})()||(()=>{if(91!==C.charCodeAt(g))return!1;{v+="[",g++,b(),p(l)&&b();let t=!0;for(;g<C.length&&93!==C.charCodeAt(g);){t?t=!1:i(l)||(v=W(v,",")),a();var e=c();if(!e){v=V(v,",");break}}return 93===C.charCodeAt(g)?(v+="]",g++):v=W(v,"]"),!0}})()||w()||(()=>{var t,e,r=g;if(45===C.charCodeAt(g)){if(g++,o())return h(r),!0;if(!U(C.charCodeAt(g)))return g=r,!1}for(;U(C.charCodeAt(g));)g++;if(46===C.charCodeAt(g)){if(g++,o())return h(r),!0;if(!U(C.charCodeAt(g)))return g=r,!1;for(;U(C.charCodeAt(g));)g++}if(101===C.charCodeAt(g)||69===C.charCodeAt(g)){if(g++,45!==C.charCodeAt(g)&&43!==C.charCodeAt(g)||g++,o())return h(r),!0;if(!U(C.charCodeAt(g)))return g=r,!1;for(;U(C.charCodeAt(g));)g++}if(o()){if(g>r)return t=C.slice(r,g),e=/^0\d/.test(t),v+=e?'"'.concat(t,'"'):t,!0}else g=r;return!1})()||e("true","true")||e("false","false")||e("null","null")||e("True","true")||e("False","false")||e("None","null")||f(!1)||(()=>{if("/"===C[g]){var t=g;for(g++;g<C.length&&("/"!==C[g]||"\\"===C[g-1]);)g++;return g++,v+='"'.concat(C.substring(t,g),'"'),!0}})();return b(),t}function b(t){var e=!(0<arguments.length&&void 0!==t)||t;g;let r=n(e);for(;r=(r=(()=>{if(47===C.charCodeAt(g)&&42===C.charCodeAt(g+1)){for(;g<C.length&&!((t,e)=>"*"===t[e]&&"/"===t[e+1])(C,g);)g++;g+=2}else{if(47!==C.charCodeAt(g)||47!==C.charCodeAt(g+1))return!1;for(;g<C.length&&C.charCodeAt(g)!==O;)g++}return!0})())&&n(e););g}function n(t){var e=t?H:rt;let r="";for(;;){var n=C.charCodeAt(g);if(e(n))r+=C[g];else{if(!((n=n)===s||n>=A&&n<=E||n===R||n===X||n===Y))break;r+=" "}g++}return 0<r.length&&(v+=r,!0)}function i(t){return C.charCodeAt(g)===t&&(v+=C[g],g++,!0)}function p(t){return C.charCodeAt(g)===t&&(g++,!0)}function a(){b(),46===C.charCodeAt(g)&&46===C.charCodeAt(g+1)&&46===C.charCodeAt(g+2)&&(g+=3,b(),p(l))}function w(t,e){var r,n,o=0<arguments.length&&void 0!==t&&t,c=1<arguments.length&&void 0!==e?e:-1;let i=92===C.charCodeAt(g);if(i&&(g++,i=!0),K(C.charCodeAt(g))){var a=M(C.charCodeAt(g))?M:Q(C.charCodeAt(g))?Q:P(C.charCodeAt(g))?P:L,f=g,h=v.length;let e='"';for(g++;;){if(g>=C.length)return u=x(g-1),!o&&F(C.charAt(u))?(g=f,v=v.substring(0,h),w(!0)):(e=W(e,'"'),v+=e,!0);if(g===c)return e=W(e,'"'),v+=e,!0;if(a(C.charCodeAt(g))){var u=g,d=e.length;if(e+='"',g++,v+=e,b(!1),o||g>=C.length||F(C.charAt(g))||K(C.charCodeAt(g))||U(C.charCodeAt(g)))return $(),!0;var l=x(u-1),s=C.charAt(l);if(","===s)return g=f,v=v.substring(0,h),w(!1,l);if(F(s))return g=f,v=v.substring(0,h),w(!0);v=v.substring(0,h),g=u+1,e="".concat(e.substring(0,d),"\\").concat(e.substring(d))}else{if(o&&D(C[g])){if(58===C.charCodeAt(g-1)&&q.test(C.substring(f+1,g+2)))for(;g<C.length&&B.test(C[g]);)e+=C[g],g++;return e=W(e,'"'),v+=e,$(),!0}if(92===C.charCodeAt(g)){l=C.charAt(g+1);if(void 0!==ot[l])e+=C.slice(g,g+2),g+=2;else if("u"===l){let t=2;for(;t<6&&((n=C.charCodeAt(g+t))>=m&&n<=z||n>=I&&n<=Z||n>=T&&n<=_);)t++;if(6===t)e+=C.slice(g,g+6),g+=6;else{if(!(g+t>=C.length))throw s=void 0,s=C.slice(g,g+6),new y('Invalid unicode character "'.concat(s,'"'),g);g=C.length}}else e+=l,g+=2}else{var d=C.charAt(g),A=C.charCodeAt(g);if(A===k&&92!==C.charCodeAt(g-1))e+="\\".concat(d);else if((r=A)===O||r===J||r===N||r===S||r===j)e+=nt[d];else{if(!(32<=(r=A)&&r<=1114111))throw A=void 0,A=d,new y("Invalid character ".concat(JSON.stringify(A)),g);e+=d}g++}}i&&p(92)}}return!1}function $(){let t=!1;for(b();43===C.charCodeAt(g);){t=!0,g++,b();var e=(v=V(v,'"',!0)).length,r=w();v=r?(r=v,e=e,n=1,r.substring(0,e)+r.substring(e+n)):W(v,'"')}var n;t}function e(t,e){return C.slice(g,g+t.length)===t&&(v+=e,g+=t.length,!0)}function f(t){var e=g;if(tt.test(C[g])){for(;g<C.length&&et.test(C[g]);)g++;let t=g;for(;H(C.charCodeAt(t));)t++;if("("===C[t])return g=t+1,c(),41===C.charCodeAt(g)&&(g++,59===C.charCodeAt(g))&&g++,!0}for(;g<C.length&&!D(C[g])&&!K(C.charCodeAt(g))&&(!t||58!==C.charCodeAt(g));)g++;if(58===C.charCodeAt(g-1)&&q.test(C.substring(e,g+2)))for(;g<C.length&&B.test(C[g]);)g++;if(g>e){for(;H(C.charCodeAt(g-1))&&0<g;)g--;e=C.slice(e,g);return v+="undefined"===e?"null":JSON.stringify(e),C.charCodeAt(g)===k&&g++,!0}}function x(t){let e=t;for(;0<e&&H(C.charCodeAt(e));)e--;return e}function o(){return g>=C.length||F(C[g])||H(C.charCodeAt(g))}function h(t){v+="".concat(C.slice(t,g),"0")}function u(){throw new y("Colon expected",g)}}});
-// jsonrepair全局对象：JSONRepair.jsonrepair(text)
+// ============================================================
+//  TVBox 本地 JSON 工具 —— 自动修复 / 自动美化版
+//  特性：粘贴、拖入、打开文件时自动 jsonrepair 修复 + 多行缩进美化
+// ============================================================
 
-const $ = s => document.querySelector(s);
-const msgBox = $('#msg');
-const fileInput = $('#fileInput');
-const inputTextarea = $('#input');
+var $ = function (s) { return document.querySelector(s); };
+var msgBox = $('#msg');
+var statsBox = $('#stats');
+var fileInput = $('#fileInput');
+var inputTextarea = $('#input');
+var treeDom = $('#tree');
+var btnAuto = $('#btnAuto');
+var btnWrap = $('#btnWrap');
+var btnGuide = $('#btnGuide');
+var guides = $('#guides');
+var hlBox = $('#hl');
+var hlCode = $('#hl-code');
+var indentSel = $('#indentSel');
 
-let treeDebounceTimer = null;
-const DEBOUNCE_DELAY = 300;
-inputTextarea.addEventListener('input', function () {
-  clearTimeout(treeDebounceTimer);
-  treeDebounceTimer = setTimeout(parseTree, DEBOUNCE_DELAY);
-});
-window.addEventListener('beforeunload', ()=> clearTimeout(treeDebounceTimer));
+var INDENT_MAP = { '2': 2, '4': 4, 'tab': '\t' };
+var DEBOUNCE_DELAY = 250;
+var BIG_NODE = 1000;         // 仅当某个节点子项超过该数量时才默认折叠（懒渲染防卡顿）
+                             // 一般配置的 sites 等数组（几百项以内）一律默认展开
+var treeDebounceTimer = null;
+var lazyStore = new Map();   // 懒渲染的子节点生成器
+var lazySeq = 0;
 
-function showMsg(text, isErr=false){
+// ---------------- 配置持久化 ----------------
+var CFG_KEY = 'tvboxJsonToolCfg';
+var cfg = { auto: true, wrap: true, guides: true, indent: '2', dark: false };
+try {
+  var saved = JSON.parse(localStorage.getItem(CFG_KEY) || 'null');
+  if (saved && typeof saved === 'object') {
+    if (typeof saved.auto === 'boolean') cfg.auto = saved.auto;
+    if (typeof saved.wrap === 'boolean') cfg.wrap = saved.wrap;
+    if (typeof saved.guides === 'boolean') cfg.guides = saved.guides;
+    if (INDENT_MAP[saved.indent] !== undefined) cfg.indent = saved.indent;
+    if (typeof saved.dark === 'boolean') cfg.dark = saved.dark;
+  }
+} catch (e) {}
+function saveCfg() {
+  try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
+}
+function curIndent() {
+  return INDENT_MAP[cfg.indent] === undefined ? 2 : INDENT_MAP[cfg.indent];
+}
+function hasRepair() {
+  return typeof JSONRepair !== 'undefined' && JSONRepair && typeof JSONRepair.jsonrepair === 'function';
+}
+
+// ---------------- 通用工具 ----------------
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function setMsg(text, isErr) {
   msgBox.className = isErr ? 'error' : 'success';
-  msgBox.innerText = text;
+  msgBox.textContent = text || '';
+}
+// 替换左侧内容：光标与滚动条一律回到最左上（横竖都归零），
+// 否则长行会把横向滚动条停在中间，看起来“没在最左边”。
+function setInputValue(text) {
+  inputTextarea.value = text;
+  try { inputTextarea.setSelectionRange(0, 0); } catch (e) {}
+  inputTextarea.scrollTop = 0;
+  inputTextarea.scrollLeft = 0;
 }
 
-function repairJson(){
-  const txt = $('#input').value.trim();
-  if(!txt){ showMsg("❌输入内容为空",true); return; }
-  try{
-    JSON.parse(txt);
-    showMsg("✅JSON无需修复");
-    return;
-  }catch(err){}
+// ---------------- 左栏语法高亮（配色与右栏树形完全一致） ----------------
+// textarea 不能给局部文字上色：把它的文字设为透明（光标仍由 caret-color 显示），
+// 底下垫一个字体 / 内边距 / 换行规则完全相同的 <pre>，由这里把文本切成 token 着色。
+// 切词只做词法扫描，不依赖 JSON.parse —— 内容非法 / 字符串没闭合（正在输入）时也照常着色。
+var HL_MAX = 1000000;          // 超过该字符数跳过高亮，退回单色文字
+var hlRaf = 0;
+var HL_TOKEN_RE = /"(?:\\.|[^"\\\r\n])*"?|'(?:\\.|[^'\\\r\n])*'?|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|\btrue\b|\bfalse\b|\bnull\b|[{}\[\]:,]/g;
 
-  if(typeof JSONRepair?.jsonrepair !== "function"){
-    showMsg("❌jsonrepair库未加载",true);
-    return;
-  }
-
-  try{
-      // 调用库修复
-      const rawFixed = JSONRepair.jsonrepair(txt);
-      // 修复完成之后自动格式化美化
-      const obj = JSON.parse(rawFixed);
-      const pretty = JSON.stringify(obj,null,2);
-      $('#input').value = pretty;
-      parseTree();
-      showMsg("✅自动修复并美化完成！请人工核对修复结果！");
-  }catch(e2){
-    showMsg("❌修复失败："+e2.message,true);
-  }
-}
-
-function formatJson(){
-  const txt = $('#input').value.trim();
-  try{
-    const obj = JSON.parse(txt);
-    $('#input').value = JSON.stringify(obj,null,2);
-    parseTree();
-    showMsg("✅ JSON校验通过，已美化");
-  }catch(e){ showMsg("❌ JSON语法错误："+e.message,true); }
-}
-
-function compressJson(){
-  const txt = $('#input').value.trim();
-  try{
-    const obj = JSON.parse(txt);
-    $('#input').value = JSON.stringify(obj);
-    parseTree();
-    showMsg("✅ 压缩完成");
-  }catch(e){ showMsg("❌ JSON语法错误："+e.message,true); }
-}
-
-function parseTree(){
-  const txt = $('#input').value.trim();
-  const treeDom = $('#tree');
-  try{
-    if(!txt){ treeDom.innerText = ""; msgBox.innerText = ""; return; }
-    const obj = JSON.parse(txt);
-    treeDom.innerHTML = renderTree(obj);
-    showMsg("✅ 树形解析成功");
-  }catch(e){
-    treeDom.innerText = "JSON解析失败：" + e.message;
-    showMsg("❌ JSON语法错误："+e.message,true);
-  }
-}
-
-function renderTree(data){
-  if(Array.isArray(data)){
-    let html = '[<div style="padding-left:18px">';
-    data.forEach((item,i)=> html += `<div>[${i}]: ${renderTree(item)}</div>`);
-    html += '</div>]';
-    return html;
-  }else if(typeof data === 'object' && data!==null){
-    let html = '{<div style="padding-left:18px">';
-    for(let k in data){
-      const v = data[k];
-      html += `<div><span class="tree-key">"${k}"</span>: ${renderTree(v)}</div>`;
+// 把任意文本（含非法 JSON）转成分色 HTML；空白 / 换行 / 无法识别的字符原样保留
+function highlightJson(text) {
+  var out = [];
+  var last = 0;
+  HL_TOKEN_RE.lastIndex = 0;
+  var m;
+  while ((m = HL_TOKEN_RE.exec(text))) {
+    if (m.index > last) out.push(escapeHtml(text.slice(last, m.index)));
+    var tok = m[0];
+    var c = tok.charAt(0);
+    if (c === '"' || c === "'") {
+      // 向后跳过空白，紧跟冒号的字符串是「键」，否则是字符串值
+      var j = HL_TOKEN_RE.lastIndex;
+      while (j < text.length) {
+        var cc = text.charCodeAt(j);
+        if (cc === 32 || cc === 9 || cc === 13 || cc === 10) { j++; } else { break; }
+      }
+      out.push('<span class="' + (text.charAt(j) === ':' ? 'tok-key' : 'tok-string') + '">' + escapeHtml(tok) + '</span>');
+    } else if (c === '-' || (c >= '0' && c <= '9')) {
+      out.push('<span class="tok-num">' + escapeHtml(tok) + '</span>');
+    } else if (tok === 'true' || tok === 'false') {
+      out.push('<span class="tok-bool">' + tok + '</span>');
+    } else if (tok === 'null') {
+      out.push('<span class="tok-null">null</span>');
+    } else {
+      out.push('<span class="tok-punc">' + escapeHtml(tok) + '</span>');
     }
-    html += '</div>}';
-    return html;
-  }else if(typeof data === 'string'){
-    return `<span class="tree-string">"${escapeHtml(data)}"</span>`;
-  }else if(typeof data === 'number'){
-    return `<span class="tree-num">${data}</span>`;
-  }else if(typeof data === 'boolean'){
-    return `<span class="tree-bool">${data}</span>`;
-  }else if(data===null){
-    return `<span class="tree-null">null</span>`;
+    last = HL_TOKEN_RE.lastIndex;
+    if (m.index === HL_TOKEN_RE.lastIndex) HL_TOKEN_RE.lastIndex++;  // 零宽兜底，防死循环
   }
-  return "";
-}
-function escapeHtml(str){
-  return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
-}
-
-function copyResult(){
-  navigator.clipboard.writeText($('#input').value).then(()=>{
-    showMsg("✅ 复制成功");
-  }).catch(e=> showMsg("❌ 复制失败："+e.message,true));
+  if (last < text.length) out.push(escapeHtml(text.slice(last)));
+  // textarea 里末尾 '\n' 会多出一个空行；<pre> 末尾换行会被 HTML 解析规则吞掉，补个零宽空白
+  if (text.length && text.charAt(text.length - 1) === '\n') out.push('\u200b');
+  return out.join('');
 }
 
-function downloadJson(){
-  const text = $('#input').value.trim();
-  if(!text){ showMsg("❌ 内容为空，无法导出",true); return; }
-  try{
+// 高亮层的可视尺寸必须与 textarea 内容盒一致（Windows 经典滚动条会占宽），
+// 否则长 URL 的折行位置两边会差一个滚动条宽度
+function syncHlBox() {
+  if (!hlBox) return;
+  hlBox.style.width = inputTextarea.clientWidth + 'px';
+  hlBox.style.height = inputTextarea.clientHeight + 'px';
+  // nowrap：pre 按 textarea 的 scrollWidth 显式撑开，#hl 的横滚范围才能与
+  // textarea 完全一致（否则 pre 宽度停在 clientWidth，横滚到尾部时底层少滚一截）
+  if (document.body.classList.contains('nowrap')) {
+    hlCode.style.width = inputTextarea.scrollWidth + 'px';
+  } else {
+    hlCode.style.width = '';
+  }
+}
+
+function syncHlScroll() {
+  if (!hlBox) return;
+  hlBox.scrollTop = inputTextarea.scrollTop;
+  hlBox.scrollLeft = inputTextarea.scrollLeft;
+}
+
+function renderHighlight() {
+  if (!hlCode) return;
+  syncHlBox();
+  var text = inputTextarea.value;
+  if (text.length > HL_MAX) {
+    hlCode.innerHTML = '';
+    document.body.classList.add('hl-off');
+  } else {
+    document.body.classList.remove('hl-off');
+    hlCode.innerHTML = highlightJson(text);
+  }
+  syncHlScroll();
+}
+
+function scheduleHighlight() {
+  if (hlRaf) return;
+  if (typeof requestAnimationFrame === 'function') {
+    hlRaf = requestAnimationFrame(function () { hlRaf = 0; renderHighlight(); });
+  } else {
+    hlRaf = 1;
+    setTimeout(function () { hlRaf = 0; renderHighlight(); }, 16);
+  }
+}
+
+// ---------------- 核心：文本 → 美化结果 ----------------
+// 【重要】只做美化，绝不自动修复 —— 解析失败就原样保留，修复只能由用户手动点「🔧 自动修复」。
+// mode='auto'   自动美化：仅处理以 { 或 [ 开头的合法 JSON，其余一律不动
+// mode='manual' 手动美化：任何能解析的 JSON 都美化
+// 返回 { text, obj } 或 null（无法解析）
+function beautify(raw, indent, mode) {
+  var src = String(raw).replace(/^\uFEFF/, '').trim();
+  if (!src) return null;
+  if (mode === 'auto') {
+    var c0 = src.charAt(0);
+    if (c0 !== '{' && c0 !== '[') return null;
+  }
+  var ind = INDENT_MAP[indent] === undefined ? 2 : INDENT_MAP[indent];
+  var obj;
+  try {
+    obj = JSON.parse(src);
+  } catch (e) {
+    return null;
+  }
+  return { text: JSON.stringify(obj, null, ind), obj: obj };
+}
+
+// ---------------- 自动美化流水线 ----------------
+// 返回 true 表示左侧文本被改写
+function autoBeautify(trigger) {
+  if (!cfg.auto) return false;
+  var raw = inputTextarea.value;
+  var res = beautify(raw, cfg.indent, 'auto');
+  if (!res) {
+    // 不是合法 JSON：原样保留，不修复不动一个字
+    parseTree();
+    setMsg('⚠️ 不是有效 JSON，未自动美化（如需修复请点「🔧 自动修复」）', true);
+    return false;
+  }
+  var changed = res.text !== raw;
+  if (changed) setInputValue(res.text);
+  parseTree(res.obj);
+  if (changed) {
+    setMsg('⚡ 已自动美化' + (trigger ? '（' + trigger + '）' : ''), false);
+  } else if (trigger) {
+    setMsg('✅ ' + trigger + '成功（内容已是标准缩进格式）', false);
+  }
+  return changed;
+}
+
+// ---------------- 树形预览 ----------------
+function parseTree(objPassed) {
+  scheduleGuides();          // 内容一变就重算缩进竖线
+  renderHighlight();         // 内容一变就重刷左栏语法高亮
+  var raw = inputTextarea.value.trim();
+  if (!raw) {
+    treeDom.innerHTML = '';
+    lazyStore.clear();
+    setMsg('');
+    updateStats(undefined);
+    return;
+  }
+  lazyStore.clear();
+  lazySeq = 0;
+
+  var obj = objPassed, err = null;
+  if (obj === undefined) {
+    try {
+      obj = JSON.parse(raw);
+    } catch (e) {
+      err = e;   // 不做任何自动修复，只如实报错
+    }
+  }
+
+  if (obj === undefined) {
+    treeDom.innerHTML = '<div class="tree-error">JSON 解析失败：' + escapeHtml(err ? err.message : '未知错误') + '</div>';
+    setMsg('❌ JSON语法错误：' + (err ? err.message : '未知错误'), true);
+    updateStats(undefined);
+    return;
+  }
+
+  treeDom.innerHTML = renderTree(obj, '');
+  setMsg('✅ 树形解析成功', false);
+  updateStats(obj);
+}
+
+function renderTree(data, keyHtml) {
+  if (data !== null && typeof data === 'object') {
+    var isArr = Array.isArray(data);
+    var pairs = [];
+    var i;
+    if (isArr) {
+      for (i = 0; i < data.length; i++) {
+        pairs.push(['<span class="tree-idx">' + i + '</span>', data[i]]);
+      }
+    } else {
+      var keys = Object.keys(data);
+      for (i = 0; i < keys.length; i++) {
+        pairs.push(['<span class="tree-key">"' + escapeHtml(keys[i]) + '"</span>', data[keys[i]]]);
+      }
+    }
+    var open = isArr ? '[' : '{';
+    var close = isArr ? ']' : '}';
+    var lazy = pairs.length > BIG_NODE;
+    var collapsed = lazy;
+
+    var body;
+    if (lazy) {
+      var id = 'lz' + (++lazySeq);
+      lazyStore.set(id, (function (p) {
+        return function () { return renderChildren(p); };
+      })(pairs));
+      body = '<div class="tn-body" data-lazy="' + id + '"></div>';
+    } else {
+      body = '<div class="tn-body">' + renderChildren(pairs) + '</div>';
+    }
+
+    return '<div class="tn' + (collapsed ? ' collapsed' : '') + '">'
+      + '<div class="tn-head">'
+      + '<span class="tog" title="点击展开 / 折叠">▾</span>'
+      + (keyHtml || '')
+      + '<span class="tree-brace">' + open + '</span>'
+      + '<span class="tree-count">' + pairs.length + '</span>'
+      + '<span class="dots tree-brace">…</span>'
+      + '<span class="c-close tree-brace">' + close + '</span>'
+      + '</div>'
+      + body
+      + '<div class="tn-foot tree-brace">' + close + '</div>'
+      + '</div>';
+  }
+  return '<div class="tn-leaf">' + (keyHtml || '') + renderScalar(data) + '</div>';
+}
+
+function renderChildren(pairs) {
+  var html = '';
+  for (var i = 0; i < pairs.length; i++) {
+    html += renderTree(pairs[i][1], pairs[i][0] + '<span class="tree-brace">: </span>');
+  }
+  return html;
+}
+
+function renderScalar(v) {
+  if (typeof v === 'string') {
+    // URL 值渲染成可点击链接（参考 jsontool.cn），点击后新标签页直接访问
+    if (/^https?:\/\//i.test(v)) {
+      var safe = escapeHtml(v);
+      return '<span class="tree-string">"<a class="tree-link" href="' + safe + '" target="_blank" rel="noopener noreferrer" title="点击访问">' + safe + '</a>"</span>';
+    }
+    return '<span class="tree-string">"' + escapeHtml(v) + '"</span>';
+  }
+  if (typeof v === 'number') return '<span class="tree-num">' + v + '</span>';
+  if (typeof v === 'boolean') return '<span class="tree-bool">' + v + '</span>';
+  if (v === null) return '<span class="tree-null">null</span>';
+  return '<span>' + escapeHtml(String(v)) + '</span>';
+}
+
+function hasClass(el, cls) {
+  return el && el.nodeType === 1 && (' ' + (el.className || '') + ' ').indexOf(' ' + cls + ' ') > -1;
+}
+function closestByClass(el, cls, stop) {
+  while (el && el !== stop) {
+    if (hasClass(el, cls)) return el;
+    el = el.parentNode;
+  }
+  return null;
+}
+function childBody(node) {
+  for (var i = 0; i < node.children.length; i++) {
+    if (hasClass(node.children[i], 'tn-body')) return node.children[i];
+  }
+  return null;
+}
+function fillLazy(body) {
+  if (!body) return;
+  var id = body.getAttribute('data-lazy');
+  if (!id) return;
+  var fn = lazyStore.get(id);
+  if (fn) {
+    body.innerHTML = fn();
+    body.removeAttribute('data-lazy');
+    lazyStore.delete(id);
+  }
+}
+function fillAllLazy() {
+  var guard = 0, bodies;
+  while ((bodies = treeDom.querySelectorAll('[data-lazy]')).length > 0 && guard++ < 60) {
+    for (var i = 0; i < bodies.length; i++) fillLazy(bodies[i]);
+  }
+}
+
+treeDom.addEventListener('click', function (e) {
+  var tog = closestByClass(e.target, 'tog', treeDom);
+  if (!tog) return;
+  var node = closestByClass(tog, 'tn', treeDom);
+  if (!node) return;
+  node.classList.toggle('collapsed');
+  if (!hasClass(node, 'collapsed')) {
+    fillLazy(childBody(node));
+    fillAllLazy();
+  }
+});
+
+function setAllCollapsed(collapsed) {
+  var nodes = treeDom.querySelectorAll('.tn');
+  for (var i = 0; i < nodes.length; i++) nodes[i].classList.toggle('collapsed', collapsed);
+  if (!collapsed) fillAllLazy();
+}
+
+// ============================================================
+//  缩进竖线引导层（HBuilderX 风格的 indent guides）
+//  textarea 内部画不了线，做法是：
+//    1. 建一个与 textarea 同字体、同宽度、同换行规则的隐藏“镜像”元素；
+//    2. 镜像里用 <br> 分行（**不要**每行套一个 <span>：逐行 <span> 会改变
+//       浏览器的断行计算，长 URL 折行数与真实 textarea 不一致，累积漂移），
+//       再用 Range.getClientRects() 拿到该行**真实的视觉位置**
+//       （自动换行时一行会有多个 rect，取首尾即可精确算出上下边界）；
+//    3. 按缩进层级在这些位置画出 1px 竖线段（相邻行合并成整段，减少 DOM 节点）；
+//    4. **只把落在当前可见窗口内的部分渲染成 div**（坐标都是视口坐标，数值很小）。
+//       不能把整条线做成 top/height 上万像素的超长 div再用 transform 跟随滚动 ——
+//       那样子元素远超父容器范围，Chromium 的绘制会把它们整段裁掉，
+//       症状就是「滚动到下面竖线全都不见了」。
+// ============================================================
+var GUIDE_MAX_LINES = 4000;   // 超过则不做（避免卡顿）
+var GUIDE_MAX_DEPTH = 40;
+var mirrorEl = null;
+var guideTimer = null;
+var guideSegs = [];          // 全量竖线段（文档坐标），内容/尺寸变化时重算
+var wrapSegs = [];           // 折行标记线段（文档坐标）
+var guidePaintRaf = 0;      // 重绘节流
+var GUIDE_MARGIN = 240;     // 视口上下各多画一点，滚动时不闪
+
+// ============================================================
+//  折行标记（wrap mark）—— 让左栏的“折行续行”一眼看出是上一行的续行
+//  ── 为什么不做「悬挂缩进」：
+//  textarea 里软换行的续行**永远**从内容盒左边缘开始（浏览器行为，CSS 无法按行设缩进）。
+//  早先曾试图把 padding-left 挪到「长行的缩进位置」来对齐续行，代价是编辑区变窄：
+//  原本刚好排得下的长行（如 "jar": "https://…jpg"）被挤到折行，反倒多出更多断成两截的行。
+//  所以这里不再动任何布局宽度，只在左侧留白里画一个浅色「↳」——
+//  续行就明确“属于上一行”，不会再看起来像掉到最左边的孤立行。
+//  ── 实现：与竖线同一套测量（镜像 + Range），只画当前可见窗口，见 paintGuides。
+// ============================================================
+var WRAP_MARK_X = 4;        // 标记横坐标（落在 textarea 的 padding-left 留白里）
+var WRAP_MARK_HOOK = 6;     // 横勾长度（px）
+
+// 由 measureRows 给出的「续行盒」生成标记线段：竖干（连接整组续行）+ 横勾（指向续行起点）
+// padT：镜像坐标 → 编辑器坐标的纵向偏移（与竖线的 top 口径保持一致）
+function buildWrapSegs(contGroups, padT) {
+  padT = padT || 0;
+  var segs = [];
+  for (var i = 0; i < contGroups.length; i++) {
+    var g = contGroups[i];
+    if (!g || !g.length) continue;
+    var first = g[0], last = g[g.length - 1];
+    var h = first.bottom - first.top;
+    if (!(h > 4)) h = 20.8;
+    var hookY = Math.round(first.top + h * 0.5) + padT;
+    var stemTop = first.top - h * 0.4 + padT;      // 往上接住折行的首行
+    var stemBottom = last.top + h * 0.5 + padT;
+    if (stemBottom - stemTop >= 3) {
+      segs.push({ left: WRAP_MARK_X, top: stemTop, width: 1, height: stemBottom - stemTop });
+    }
+    segs.push({ left: WRAP_MARK_X, top: hookY, width: WRAP_MARK_HOOK, height: 1 });
+  }
+  return segs;
+}
+
+function ensureMirror() {
+  if (mirrorEl && mirrorEl.parentNode) return mirrorEl;
+  mirrorEl = document.createElement('div');
+  mirrorEl.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(mirrorEl);
+  return mirrorEl;
+}
+
+function measureCharWidth(cs) {
+  var p = document.createElement('span');
+  p.style.cssText = 'position:absolute;left:-100000px;top:0;visibility:hidden;white-space:pre;'
+    + 'font-family:' + cs.fontFamily + ';font-size:' + cs.fontSize + ';font-weight:' + cs.fontWeight
+    + ';font-style:' + cs.fontStyle + ';letter-spacing:' + cs.letterSpacing;
+  p.textContent = '0000000000';
+  document.body.appendChild(p);
+  var w = p.getBoundingClientRect().width / 10;
+  document.body.removeChild(p);
+  return w > 0 ? w : 8;
+}
+
+// 返回 { rows:[{top,bottom}], charWidth } 或 null
+function measureRows(text, cs, contentW) {
+  var m = ensureMirror();
+  m.style.cssText = 'position:absolute;left:-100000px;top:0;visibility:hidden;pointer-events:none;'
+    + 'margin:0;border:0;padding:0;box-sizing:content-box;overflow:visible;width:' + contentW + 'px;'
+    + 'font-family:' + cs.fontFamily + ';font-size:' + cs.fontSize + ';font-weight:' + cs.fontWeight
+    + ';font-style:' + cs.fontStyle + ';letter-spacing:' + cs.letterSpacing
+    + ';line-height:' + cs.lineHeight + ';tab-size:' + cs.tabSize
+    + ';white-space:' + cs.whiteSpace + ';overflow-wrap:' + cs.overflowWrap + ';word-break:' + cs.wordBreak;
+
+  var lines = text.split('\n');
+  var parts = [];
+  for (var i = 0; i < lines.length; i++) {
+    // 空行用零宽空格占位，保证每个文本节点都能测到 rect
+    parts.push(lines[i] ? escapeHtml(lines[i]) : '\u200b');
+  }
+  m.innerHTML = parts.join('<br>');
+
+  var base = m.getBoundingClientRect();
+  var lh = parseFloat(cs.lineHeight);
+  if (!(lh > 0)) lh = (parseFloat(cs.fontSize) || 13) * 1.2;
+
+  var range = null;
+  try { range = document.createRange(); } catch (e) { range = null; }
+
+  var rows = [];
+  var contGroups = [];        // 每个「确实折行的逻辑行」的续行盒（供折行标记使用）
+  var prevBottom = 0;
+  var node = m.firstChild;
+  while (node) {
+    if (node.nodeType === 3) {            // 每个文本节点正好是一行
+      if (rows.length >= lines.length) break;
+      var top = null, bottom = null, rects = null;
+      if (range && range.selectNodeContents) {
+        try { range.selectNodeContents(node); rects = range.getClientRects(); } catch (e) { rects = null; }
+      }
+      var lead = 0;
+      if (rects && rects.length) {
+        top = rects[0].top - base.top;
+        bottom = rects[rects.length - 1].bottom - base.top;
+        // rect 只是字体墨迹框，比行盒小；补上半行距，让段首/段尾正好贴住行盒，
+        // 这样相邻两行首尾相接，不会出现几像素的缝
+        lead = (lh - (rects[0].bottom - rects[0].top)) / 2;
+        if (lead > 0 && lead < lh / 2) { top -= lead; bottom += lead; } else { lead = 0; }
+        // 判断软换行：行首缩进空白会被 Range 切成独立 rect（旧版 Chromium 零宽，
+        // 新版等于空格的真实宽度），所以「rect 数 > 1」不能当折行依据。
+        // 同一视觉行上的 rect top 相同；真正折行的续行一定出现在更低的 top 上。
+        // 按 top 把 rect 聚成视觉行，第 2 个及以后的聚类才是续行。
+        var clusters = [];
+        for (var k = 0; k < rects.length; k++) {
+          var rr = rects[k];
+          if (rr.width <= 0.5) continue;
+          var ci = -1;
+          for (var c = 0; c < clusters.length; c++) {
+            if (Math.abs(rr.top - clusters[c].top) <= lh * 0.5) { ci = c; break; }
+          }
+          if (ci < 0) clusters.push({ top: rr.top, bottom: rr.bottom });
+          else if (rr.bottom > clusters[ci].bottom) clusters[ci].bottom = rr.bottom;
+        }
+        if (clusters.length > 1) {
+          var grp = [];
+          for (var k2 = 1; k2 < clusters.length; k2++) {
+            grp.push({ top: clusters[k2].top - base.top - lead, bottom: clusters[k2].bottom - base.top + lead });
+          }
+          contGroups.push(grp);
+        }
+      }
+      if (top === null) { top = prevBottom; bottom = top + lh; }
+      rows.push({ top: top, bottom: bottom });
+      prevBottom = bottom;
+    }
+    node = node.nextSibling;
+  }
+  while (rows.length < lines.length) {      // 兜底：节点数异常时按行高补齐
+    rows.push({ top: prevBottom, bottom: prevBottom + lh });
+    prevBottom += lh;
+  }
+  return { rows: rows, contGroups: contGroups, charWidth: measureCharWidth(cs) };
+}
+
+// 缩进空白字符的「等效半角空格宽度」；返回 -1 表示不是缩进空白
+// 从网页 / 输入法 / 其它工具复制来的内容，缩进常常不是普通空格，而是
+// NBSP(\u00A0)、全角空格(\u3000)、各种 Unicode 空格 —— 它们肉眼和空格一样，
+// 只认 ' ' 会导致这些行层级算成 0，竖线整段消失。
+function indentCharWeight(c) {
+  if (c === ' ') return 1;
+  if (c === '\t') return 2;                                   // textarea 的 tab-size 固定为 2
+  if (c === '\u3000') return 2;                               // 全角空格
+  if (c === '\u00A0' || c === '\u2007' || c === '\u202F') return 1;   // 各类不换行空格
+  if (c >= '\u2000' && c <= '\u200A') return 1;               // en/em/薄空格等
+  if (c === '\u200B' || c === '\uFEFF' || c === '\u2060') return 0;   // 零宽字符：跳过，不算断尾
+  return -1;
+}
+
+// 一行开头的缩进等效半角宽度（按字符数算）
+function lineIndentWidth(line) {
+  var w = 0;
+  for (var i = 0; i < line.length; i++) {
+    var k = indentCharWeight(line.charAt(i));
+    if (k < 0) break;
+    w += k;
+    if (w > 8 * GUIDE_MAX_DEPTH) break;
+  }
+  return w;
+}
+
+// 一行开头的缩进层级（按给定缩进单位换算）
+function lineDepth(line, unit) {
+  return Math.floor(lineIndentWidth(line) / unit);
+}
+
+function indentUnitChars() {
+  if (cfg.indent === 'tab') return 2;   // textarea 的 tab-size 固定为 2
+  return cfg.indent === '4' ? 4 : 2;
+}
+
+function gcdInt(a, b) { while (b) { var t = a % b; a = b; b = t; } return a; }
+
+// 从内容推断实际缩进单位（各非零缩进的最大公约数，限制在 1~8）
+// 避免「设置 2 空格、内容却是 4 空格或 Tab」时竖线间距差一半、越往下越偏
+function detectIndentUnit(widths, fallback) {
+  var g = 0;
+  for (var i = 0; i < widths.length; i++) {
+    var w = widths[i];
+    if (w > 0) g = g ? gcdInt(g, w) : w;
+  }
+  if (!g || g > 8) return fallback;
+  return g;
+}
+
+function renderGuides() {
+  if (!guides) return;
+  if (!cfg.guides && !cfg.wrap) { clearGuides(); return; }
+  var text = inputTextarea.value;
+  if (!text || text.length > 1200000) { clearGuides(); return; }
+  var lines = text.split('\n');
+  if (lines.length > GUIDE_MAX_LINES) { clearGuides(); return; }
+
+  var cs = window.getComputedStyle(inputTextarea);
+  var padL = parseFloat(cs.paddingLeft) || 0;
+  var padR = parseFloat(cs.paddingRight) || 0;
+  var padT = parseFloat(cs.paddingTop) || 0;
+  var contentW = inputTextarea.clientWidth - padL - padR;
+  if (!(contentW > 0)) { clearGuides(); return; }
+
+  // 1) 逐行算缩进等效宽度（兼容 NBSP / 全角空格等各种空白）
+  var cfgUnit = indentUnitChars();
+  var widths = [];
+  var maxWidth = 0;
+  for (var i = 0; i < lines.length; i++) {
+    var w = lineIndentWidth(lines[i]);
+    widths.push(w);
+    if (w > maxWidth) maxWidth = w;
+  }
+
+  // 2) 一次测量出「每行的视觉行盒」与「折行续行盒」，竖线和折行标记共用
+  var info;
+  try { info = measureRows(text, cs, contentW); } catch (e) { clearGuides(); return; }
+  if (!info || info.rows.length !== lines.length) { clearGuides(); return; }
+
+  // 3) 折行标记：与缩进无关，只要有软换行就画（不依赖「缩进竖线」开关）
+  wrapSegs = cfg.wrap ? buildWrapSegs(info.contGroups, padT) : [];
+
+  // 4) 缩进竖线
+  var segs = [];
+  if (cfg.guides && maxWidth > 0) {
+    // 按内容推断真实缩进单位，避免与「缩进设置」不一致导致错位
+    var unit = detectIndentUnit(widths, cfgUnit);
+    var depths = [];
+    var maxDepth = 0;
+    for (var i2 = 0; i2 < lines.length; i2++) {
+      var d = Math.floor(widths[i2] / unit);
+      if (d > GUIDE_MAX_DEPTH) d = GUIDE_MAX_DEPTH;
+      depths.push(d);
+      if (d > maxDepth) maxDepth = d;
+    }
+    var indentW = unit * info.charWidth;
+    // 最外层（第 1 层，2 空格处）不画：它紧贴编辑区左缘留白，会和折行标记
+    // 视觉上混成一条贯穿的竖线；从第 2 层开始画，层级关系依然清楚
+    var FIRST_GUIDE_LEVEL = 2;
+    for (var L = FIRST_GUIDE_LEVEL; L <= maxDepth; L++) {
+      var start = -1;
+      for (var j = 0; j <= lines.length; j++) {
+        var on = j < lines.length && depths[j] >= L;
+        if (on) { if (start < 0) start = j; continue; }
+        if (start >= 0) {
+          var top = info.rows[start].top;
+          var bottom = info.rows[j - 1].bottom;
+          if (bottom > top) {
+            segs.push({
+              left: padL + (L - 0.5) * indentW,
+              top: padT + top,
+              bottom: padT + bottom
+            });
+          }
+          start = -1;
+        }
+      }
+    }
+  }
+  guideSegs = segs;
+  paintGuides();
+}
+
+// 只绘制「当前可见窗口」内的线段（坐标全部落在视口附近）
+// 早期版本把整条线画成一个 top/height 上万像素的超长 div，再用 transform 跟随滚动，
+// 结果 Chromium 的绘制会把超长元素整段裁掉 —— 表现就是往下滚动后竖线全部消失。
+function paintGuides() {
+  if (!guides) return;
+  if (!guideSegs.length && !wrapSegs.length) { guides.innerHTML = ''; return; }
+  var st = inputTextarea.scrollTop || 0;
+  var sl = inputTextarea.scrollLeft || 0;
+  var ch = inputTextarea.clientHeight || 0;
+  if (!(ch > 0)) ch = 800;
+  var from = st - GUIDE_MARGIN;
+  var to = st + ch + GUIDE_MARGIN;
+
+  var frag = document.createDocumentFragment();
+  for (var i = 0; i < guideSegs.length; i++) {
+    var s = guideSegs[i];
+    var a = s.top > from ? s.top : from;
+    var b = s.bottom < to ? s.bottom : to;
+    if (!(b > a)) continue;
+    var el = document.createElement('div');
+    el.className = 'guide-v';
+    el.style.left = (s.left - sl) + 'px';
+    el.style.top = (a - st) + 'px';
+    el.style.height = (b - a) + 'px';
+    frag.appendChild(el);
+  }
+  // 折行标记：同样只画可见窗口内的那几段
+  for (var w = 0; w < wrapSegs.length; w++) {
+    var m = wrapSegs[w];
+    if (m.top + m.height < from || m.top > to) continue;
+    var em = document.createElement('div');
+    em.className = 'wrap-mark';
+    em.style.left = (m.left - sl) + 'px';
+    em.style.top = (m.top - st) + 'px';
+    em.style.width = m.width + 'px';
+    em.style.height = m.height + 'px';
+    frag.appendChild(em);
+  }
+  guides.innerHTML = '';
+  guides.appendChild(frag);
+}
+
+function scheduleGuides() {
+  clearTimeout(guideTimer);
+  guideTimer = setTimeout(renderGuides, 50);
+  scheduleGuidePaint();
+}
+
+// 滚动/改窗口时只重绘可见窗口，不重算测量结果
+function scheduleGuidePaint() {
+  if (guidePaintRaf) return;
+  if (typeof requestAnimationFrame === 'function') {
+    guidePaintRaf = requestAnimationFrame(function () { guidePaintRaf = 0; paintGuides(); });
+  } else {
+    guidePaintRaf = 1;
+    setTimeout(function () { guidePaintRaf = 0; paintGuides(); }, 16);
+  }
+}
+
+function clearGuides() {
+  guideSegs = [];
+  wrapSegs = [];
+  if (guides) guides.innerHTML = '';
+}
+
+// ---------------- 统计信息 ----------------
+function updateStats(obj) {
+  var text = inputTextarea.value;
+  if (!text.trim()) { statsBox.textContent = ''; return; }
+  var lines = text.split('\n').length;
+  var info = '';
+  if (obj !== undefined && obj !== null) {
+    if (Array.isArray(obj)) info = '数组 ' + obj.length + ' 项';
+    else if (typeof obj === 'object') info = '对象 ' + Object.keys(obj).length + ' 个键';
+    else info = typeof obj;
+  }
+  statsBox.textContent = '行数 ' + lines + '  ·  字符 ' + text.length + (info ? '  ·  ' + info : '');
+}
+
+// ---------------- 各按钮功能 ----------------
+function formatJson() {
+  var txt = inputTextarea.value.trim();
+  if (!txt) { setMsg('❌ 输入内容为空', true); return; }
+  var res = beautify(txt, cfg.indent, 'manual');
+  if (!res) {
+    var reason = '';
+    try { JSON.parse(txt); } catch (e) { reason = e.message; }
+    setMsg('❌ JSON语法错误，无法美化：' + reason + '（可先点「🔧 自动修复」）', true);
+    return;
+  }
+  setInputValue(res.text);
+  parseTree(res.obj);
+  setMsg('✅ JSON校验通过，已美化', false);
+}
+
+function repairJson() {
+  var txt = inputTextarea.value.trim();
+  if (!txt) { setMsg('❌ 输入内容为空', true); return; }
+  try { JSON.parse(txt); setMsg('✅ JSON 本身合法，无需修复', false); return; } catch (e) {}
+  if (!hasRepair()) { setMsg('❌ jsonrepair 库未加载', true); return; }
+  try {
+    var obj = JSON.parse(JSONRepair.jsonrepair(txt));
+    setInputValue(JSON.stringify(obj, null, curIndent()));
+    parseTree(obj);
+    setMsg('⚡ 自动修复并美化完成！请人工核对修复结果！', false);
+  } catch (e2) {
+    setMsg('❌ 修复失败：' + e2.message, true);
+  }
+}
+
+function compressJson() {
+  var txt = inputTextarea.value.trim();
+  if (!txt) { setMsg('❌ 输入内容为空', true); return; }
+  try {
+    var obj = JSON.parse(txt);
+    setInputValue(JSON.stringify(obj));
+    parseTree(obj);
+    setMsg('✅ 已压缩成一行', false);
+  } catch (e) { setMsg('❌ JSON语法错误：' + e.message, true); }
+}
+
+function copyResult() {
+  var text = inputTextarea.value;
+  if (!text) { setMsg('❌ 内容为空，无可复制内容', true); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () {
+      setMsg('✅ 已复制到剪贴板', false);
+    }).catch(function (e) {
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
+}
+function fallbackCopy(text) {
+  try {
+    inputTextarea.focus();
+    inputTextarea.select();
+    document.execCommand('copy');
+    setMsg('✅ 已复制到剪贴板', false);
+  } catch (e) { setMsg('❌ 复制失败：' + e.message, true); }
+}
+
+function downloadJson() {
+  var text = inputTextarea.value.trim();
+  if (!text) { setMsg('❌ 内容为空，无法导出', true); return; }
+  try {
     JSON.parse(text);
-    const blob = new Blob([text], {type: 'application/json;charset=utf-8'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+  } catch (e) { setMsg('❌ JSON语法错误，不能导出：' + e.message, true); return; }
+  try {
+    var blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
     a.href = url;
-    a.download = "json.json";
+    a.download = 'json.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showMsg("✅ 文件已下载");
-  }catch(e){ showMsg("❌ JSON语法错误，不能导出："+e.message,true); }
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    setMsg('✅ 文件已导出', false);
+  } catch (e) { setMsg('❌ 导出失败：' + e.message, true); }
 }
 
-function toggleDark(){ document.body.classList.toggle('dark'); }
+function toggleDark() {
+  cfg.dark = !cfg.dark;
+  document.body.classList.toggle('dark', cfg.dark);
+  saveCfg();
+}
 
-function clearAll(){
-  $('#input').value = '';
-  $('#tree').innerText = '';
-  msgBox.innerText='';
+function clearAll() {
+  setInputValue('');
+  treeDom.innerHTML = '';
+  lazyStore.clear();
   fileInput.value = '';
+  setMsg('', false);
+  updateStats(undefined);
+  renderHighlight();
+  renderGuides();
 }
 
-fileInput.onchange = function(e){
-  const file = e.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = evt => {
-    $('#input').value = evt.target.result;
+// ---------------- 自动美化开关 / 缩进 ----------------
+function syncAutoBtn() {
+  btnAuto.textContent = cfg.auto ? '⚡ 自动美化：开' : '⚡ 自动美化：关';
+  btnAuto.className = 'auto' + (cfg.auto ? '' : ' off');
+  btnAuto.title = cfg.auto
+    ? '已开启：粘贴 / 拖入 / 打开文件时自动美化（点击关闭）'
+    : '已关闭：只做树形预览，不自动美化（点击开启）';
+}
+
+// ---------------- 自动换行开关 ----------------
+function syncWrapBtn() {
+  btnWrap.textContent = cfg.wrap ? '↔ 自动换行：开' : '↔ 自动换行：关';
+  btnWrap.className = 'wrapbtn' + (cfg.wrap ? '' : ' off');
+  btnWrap.title = cfg.wrap
+    ? '已开启：长行自动折行显示，不会出现横向滚动条（点击改为单行显示）'
+    : '已关闭：长行不折行，可左右拖动查看（点击开启自动换行）';
+  document.body.classList.toggle('nowrap', !cfg.wrap);
+  inputTextarea.scrollLeft = 0;
+  treeDom.scrollLeft = 0;
+}
+
+// ---------------- 缩进竖线开关 ----------------
+function syncGuideBtn() {
+  btnGuide.textContent = cfg.guides ? '│ 缩进竖线：开' : '│ 缩进竖线：关';
+  btnGuide.className = 'guidebtn' + (cfg.guides ? '' : ' off');
+  btnGuide.title = cfg.guides
+    ? '已开启：按缩进层级显示竖线引导（点击关闭）'
+    : '已关闭：不显示缩进竖线（点击开启）';
+  document.body.classList.toggle('noguide', !cfg.guides);
+}
+
+// ---------------- 事件绑定 ----------------
+// 0) 输入框滚动 → 竖线层与高亮层同步位移
+inputTextarea.addEventListener('scroll', function () {
+  syncHlScroll();
+  scheduleGuidePaint();
+});
+
+// 1) 粘贴 → 自动修复 + 美化
+inputTextarea.addEventListener('paste', function () {
+  if (!cfg.auto) return;
+  setTimeout(function () { autoBeautify('已美化粘贴内容'); }, 0);
+});
+
+// 2) 拖入文本 → 自动修复 + 美化
+inputTextarea.addEventListener('drop', function () {
+  if (!cfg.auto) return;
+  setTimeout(function () { autoBeautify('已美化拖入内容'); }, 0);
+});
+
+// 3) 普通输入：rAF 刷新高亮（不等防抖，打字时即时上色）；防抖刷新预览；兜底处理不触发 paste 事件的粘贴方式
+inputTextarea.addEventListener('input', function () {
+  scheduleHighlight();
+  clearTimeout(treeDebounceTimer);
+  treeDebounceTimer = setTimeout(function () {
+    if (cfg.auto) {
+      var v = inputTextarea.value;
+      if (v.indexOf('\n') === -1 && v.trim().length > 30) {
+        var res = beautify(v, cfg.indent, 'auto');
+        if (res && res.text.indexOf('\n') > -1) { autoBeautify('已美化粘贴内容'); return; }
+      }
+    }
     parseTree();
-    showMsg(`✅ 已加载文件：${file.name}`);
-  }
-  reader.readAsText(file);
+  }, DEBOUNCE_DELAY);
+});
+
+// 4) 打开本地文件 → 自动修复 + 美化
+fileInput.onchange = function (e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function (evt) {
+    setInputValue(String(evt.target.result).replace(/^\uFEFF/, ''));
+    if (cfg.auto) {
+      autoBeautify('加载文件 ' + file.name);
+    } else {
+      parseTree();
+      setMsg('✅ 已加载文件：' + file.name, false);
+    }
+  };
+  reader.onerror = function () { setMsg('❌ 文件读取失败', true); };
+  reader.readAsText(file, 'utf-8');
+};
+
+btnAuto.addEventListener('click', function () {
+  cfg.auto = !cfg.auto;
+  saveCfg();
+  syncAutoBtn();
+  if (cfg.auto) autoBeautify('开启自动美化');
+  else setMsg('自动美化已关闭，仅保留手动按钮', false);
+});
+
+btnWrap.addEventListener('click', function () {
+  cfg.wrap = !cfg.wrap;
+  saveCfg();
+  syncWrapBtn();
+  scheduleGuides();   // 换行方式变了，竖线位置要重算
+  scheduleHighlight(); // 高亮层的换行规则 / 滚动条尺寸也要同步
+  setMsg(cfg.wrap ? '✅ 已开启自动换行（长行折行显示）' : '✅ 已关闭自动换行（长行可左右拖动查看）', false);
+});
+
+btnGuide.addEventListener('click', function () {
+  cfg.guides = !cfg.guides;
+  saveCfg();
+  syncGuideBtn();
+  renderGuides();
+  setMsg(cfg.guides ? '✅ 已开启缩进竖线引导' : '✅ 已关闭缩进竖线引导', false);
+});
+
+indentSel.addEventListener('change', function () {
+  cfg.indent = indentSel.value;
+  saveCfg();
+  if (cfg.auto) autoBeautify('切换缩进');
+  scheduleGuides();
+  setMsg('✅ 缩进已切换：' + indentSel.options[indentSel.selectedIndex].text, false);
+});
+
+$('#btnFormat').addEventListener('click', formatJson);
+$('#btnCompress').addEventListener('click', compressJson);
+$('#btnTree').addEventListener('click', function () { parseTree(); });
+$('#btnRepair').addEventListener('click', repairJson);
+$('#btnCopy').addEventListener('click', copyResult);
+$('#btnDownload').addEventListener('click', downloadJson);
+$('#btnTheme').addEventListener('click', toggleDark);
+$('#btnClear').addEventListener('click', clearAll);
+$('#btnExpand').addEventListener('click', function () { setAllCollapsed(false); });
+$('#btnCollapse').addEventListener('click', function () { setAllCollapsed(true); });
+
+window.addEventListener('keydown', function (e) {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  var k = (e.key || '').toLowerCase();
+  if (e.shiftKey && k === 'f') { e.preventDefault(); formatJson(); }
+  else if (!e.shiftKey && k === 's') { e.preventDefault(); downloadJson(); }
+});
+
+window.addEventListener('resize', function () { scheduleGuides(); scheduleHighlight(); });
+
+window.addEventListener('beforeunload', function () {
+  clearTimeout(treeDebounceTimer);
+  clearTimeout(guideTimer);
+});
+
+// ---------------- 初始化 ----------------
+document.body.classList.toggle('dark', cfg.dark);
+indentSel.value = cfg.indent;
+syncAutoBtn();
+syncWrapBtn();
+syncGuideBtn();
+updateStats(undefined);
+renderGuides();
+renderHighlight();
+if (hasRepair()) {
+  setMsg('✅ 就绪（离线单文件）｜粘贴 / 打开文件会自动美化，不会自动改动内容', false);
+} else {
+  setMsg('❌ jsonrepair 加载异常，「🔧 自动修复」不可用（自动美化不受影响）', true);
 }
 
-$('#btnFormat').addEventListener('click',formatJson);
-$('#btnCompress').addEventListener('click',compressJson);
-$('#btnTree').addEventListener('click',parseTree);
-$('#btnRepair').addEventListener('click',repairJson);
-$('#btnCopy').addEventListener('click',copyResult);
-$('#btnDownload').addEventListener('click',downloadJson);
-$('#btnTheme').addEventListener('click',toggleDark);
-$('#btnClear').addEventListener('click',clearAll);
-
-if(typeof JSONRepair?.jsonrepair === "function"){
-  showMsg("✅ jsonrepair已就绪，离线完整版");
-}else{
-  showMsg("❌ jsonrepair加载异常",true);
-}
 </script>
 </body>
 </html>
