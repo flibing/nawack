@@ -938,7 +938,23 @@ function formatJson() {
 function repairJson() {
   var txt = inputTextarea.value.trim();
   if (!txt) { setMsg('❌ 输入内容为空', true); return; }
-  try { JSON.parse(txt); setMsg('✅ JSON 本身合法，无需修复', false); return; } catch (e) {}
+  var validObj;
+  try { validObj = JSON.parse(txt); } catch (e) { validObj = undefined; }
+  if (validObj !== undefined) {
+    // 本身合法：用户可能手动删了中间内容留下空行，重新格式化把空白收拢。
+    // 保持光标与滚动位置，方便用户继续在当前位置编辑（不用 setInputValue 归零）。
+    var formatted = JSON.stringify(validObj, null, curIndent());
+    if (formatted === txt) { setMsg('✅ JSON 本身合法，无需修复', false); return; }
+    var keepTop = inputTextarea.scrollTop, keepLeft = inputTextarea.scrollLeft;
+    var keepSel = Math.min(inputTextarea.selectionStart || 0, formatted.length);
+    inputTextarea.value = formatted;
+    try { inputTextarea.setSelectionRange(keepSel, keepSel); } catch (e) {}
+    inputTextarea.scrollTop = keepTop;
+    inputTextarea.scrollLeft = keepLeft;
+    parseTree(validObj);
+    setMsg('⚡ JSON 合法，已重新格式化（多余空行已收拢）', false);
+    return;
+  }
   if (!hasRepair()) { setMsg('❌ jsonrepair 库未加载', true); return; }
   try {
     var obj = JSON.parse(JSONRepair.jsonrepair(txt));
